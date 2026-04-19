@@ -1,8 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --sidebar-w: 252px;
+  --pump-bg: #000000;
+  --pump-sidebar: #0a0a0a;
+  --pump-elevated: #0c0c0c;
+  --pump-surface: #111111;
+  --pump-surface-hover: #171717;
+  --pump-border: #1f1f1f;
+  --pump-text: #fafafa;
+  --pump-muted: #a1a1aa;
+  --pump-green: #3d7ed4;
+  --pump-green-dim: rgba(61, 126, 212, 0.16);
+  /* Nav row: active pill (pump-style, blue accent instead of mint) */
+  --pump-nav-active-bg: #1a1a1a;
+  --pump-yellow: #edc706;
+  --pump-yellow-dim: rgba(237, 199, 6, 0.14);
+  --background: var(--pump-bg);
+  --foreground: var(--pump-text);
 }
 
 @theme inline {
@@ -12,15 +27,66 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.field {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--pump-border);
+  background: var(--pump-surface);
+  padding: 0.65rem 0.85rem;
+  color: var(--pump-text);
+  font-size: 0.875rem;
+}
+
+.field:focus {
+  outline: 2px solid var(--pump-green);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  background: var(--pump-green);
+  padding: 0.75rem 1.25rem;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: #fafafa;
+  transition: opacity 0.15s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  border: 1px solid var(--pump-border);
+  background: var(--pump-surface);
+  padding: 0.65rem 1.1rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--pump-text);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.btn-ghost:hover {
+  border-color: rgba(61, 126, 212, 0.35);
+  background: var(--pump-surface-hover);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--pump-bg);
+  color: var(--pump-text);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }

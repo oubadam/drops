@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# drop MVP
 
-## Getting Started
+`drop` is a Next.js + TypeScript MVP for creator-fee buybacks and token airdrops on Solana.
 
-First, run the development server:
+Every 10 minutes, each registered campaign runs:
+1. Claim creator fees from PumpPortal
+2. Buy back token supply
+3. Queue airdrop transactions for local signing
+
+## Pages
+
+- `/` landing page
+- `/launch` register coin + frozen whitelist config
+- `/campaign/[mint]` public proof page
+- `/dashboard` creator campaign list
+
+## Local setup
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Copy env file:
+
+```bash
+cp .env.example .env.local
+```
+
+3. Fill env values (Supabase, Helius, PumpPortal, secrets).
+
+4. Start app:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Cron
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`vercel.json` is configured for `*/10 * * * *` hitting:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `GET /api/cron/run`
 
-## Learn More
+Use `CRON_SECRET` and pass `Authorization: Bearer <secret>` from Vercel.
 
-To learn more about Next.js, take a look at the following resources:
+## Local signer flow (no private keys on server)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The server stores unsigned tx payloads in `pending_signature_jobs`.
+Creator runs:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+CREATOR_WALLET=<wallet> API_BASE_URL=http://localhost:3000 npm run signer
+```
 
-## Deploy on Vercel
+This polls `GET /api/signer/pending?wallet=...`, signs locally (placeholder in MVP script), and submits via `POST /api/signer/submit`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Supabase schema
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Run SQL in `supabase/schema.sql` to create:
+- `campaigns`
+- `airdrop_runs`
+- `pending_signature_jobs`
+
+## Notes
+
+- MVP has **no platform cut**: 100% creator fees are recycled.
+- Whitelist is capped at 50% and max 25 wallets.
+- Creator wallet cannot be whitelisted.
+- If env keys are missing, API clients return mock data for UI/dev testing.

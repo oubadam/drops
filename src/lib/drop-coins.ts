@@ -1,0 +1,28 @@
+import type { CreatedCoinRecord } from "@/lib/created-coins-storage";
+
+export const DROP_MINT_SUFFIX = "drop";
+
+export function mintEndsWithDrop(mint: string): boolean {
+  return mint.endsWith(DROP_MINT_SUFFIX);
+}
+
+export function getOfficialDropsMint(): string | null {
+  const v = process.env.NEXT_PUBLIC_OFFICIAL_DROPS_MINT?.trim();
+  return v && v.length > 0 ? v : null;
+}
+
+/** Coins created in this app that qualify for drops home (…drop mint), excluding official token. */
+export function filterDropLaunches(coins: CreatedCoinRecord[]): CreatedCoinRecord[] {
+  const official = getOfficialDropsMint();
+  return coins.filter((c) => mintEndsWithDrop(c.mint) && (!official || c.mint !== official));
+}
+
+/** Placeholder until wallet connect supplies creator; shows first 6 of mint for layout parity. */
+export function devPreviewFromMint(mint: string): string {
+  return mint.slice(0, 6);
+}
+
+export function truncateMintMiddle(mint: string, head = 6, tail = 4): string {
+  if (mint.length <= head + tail + 2) return mint;
+  return `${mint.slice(0, head)}…${mint.slice(-tail)}`;
+}
