@@ -40,6 +40,14 @@ export function GlobalSearch({ layout }: { layout: GlobalSearchLayout }) {
     return () => window.removeEventListener(DROP_COINS_UPDATED_EVENT, run);
   }, [refreshRows]);
 
+  const searchShortcutLabel = useMemo(() => {
+    if (typeof navigator === "undefined") return "Ctrl+K";
+    const ua = navigator.userAgent;
+    const p = navigator.platform;
+    const isApple = /Mac|iPhone|iPad|iPod/i.test(ua) || p === "MacIntel";
+    return isApple ? "⌘K" : "Ctrl+K";
+  }, []);
+
   useEffect(() => {
     function onDoc(e: MouseEvent) {
       const t = e.target;
@@ -103,17 +111,17 @@ export function GlobalSearch({ layout }: { layout: GlobalSearchLayout }) {
           }}
           aria-label="Search"
           aria-expanded={open}
-          className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border bg-[var(--pump-surface)] text-white transition hover:border-white/15 ${
+          className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border bg-[var(--pump-surface)] text-white transition hover:border-white/15 ${
             open ? "border-[var(--pump-green)] ring-1 ring-[var(--pump-green)]/25" : "border-[var(--pump-border)]"
           }`}
         >
-          <IconSearch className="h-5 w-5" />
+          <IconSearch className="h-[1.35rem] w-[1.35rem]" />
         </button>
 
         {open ? (
           <div
             id={listboxId}
-            className="fixed left-3 right-3 top-[calc(3.5rem+4px)] z-[60] flex max-h-[min(78vh,520px)] flex-col overflow-hidden rounded-xl border border-[var(--pump-border)] bg-[#141414] shadow-2xl shadow-black/60"
+            className="fixed left-3 right-3 top-[calc(3.75rem+4px)] z-[60] flex max-h-[min(78vh,520px)] flex-col overflow-hidden rounded-xl border border-[var(--pump-border)] bg-[#141414] shadow-2xl shadow-black/60"
             role="listbox"
           >
             <div className="flex shrink-0 items-center gap-2 border-b border-[var(--pump-border)] px-3 py-2">
@@ -154,7 +162,7 @@ export function GlobalSearch({ layout }: { layout: GlobalSearchLayout }) {
   return (
     <div ref={wrapRef} className="relative mx-auto min-w-0 w-full max-w-2xl flex-1">
       <div
-        className={`flex items-center gap-2 rounded-xl border bg-[var(--pump-surface)] px-3 py-2.5 text-left text-sm transition sm:px-4 ${
+        className={`flex h-11 items-center gap-2 rounded-xl border bg-[var(--pump-surface)] px-3 py-0 text-left text-sm transition sm:px-4 ${
           open ? "border-[var(--pump-green)] ring-1 ring-[var(--pump-green)]/30" : "border-[var(--pump-border)]"
         }`}
       >
@@ -168,7 +176,7 @@ export function GlobalSearch({ layout }: { layout: GlobalSearchLayout }) {
           }}
           onFocus={() => setOpen(true)}
           placeholder="Search drops (name, ticker, mint)…"
-          className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--pump-text)] outline-none placeholder:text-[var(--pump-muted)]"
+          className="min-h-0 min-w-0 flex-1 bg-transparent text-sm leading-none text-[var(--pump-text)] outline-none placeholder:text-[var(--pump-muted)]"
           aria-label="Search drops coins by name, symbol, or mint"
           aria-controls={listboxId}
         />
@@ -185,8 +193,11 @@ export function GlobalSearch({ layout }: { layout: GlobalSearchLayout }) {
             ✕
           </button>
         ) : null}
-        <kbd className="ml-auto hidden shrink-0 rounded border border-[var(--pump-border)] bg-[var(--pump-bg)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--pump-muted)] sm:inline">
-          ⌘K
+        <kbd
+          className="ml-auto inline-flex shrink-0 items-center rounded border border-[var(--pump-border)] bg-[var(--pump-bg)] px-1.5 py-0.5 font-mono text-[10px] leading-none text-[var(--pump-muted)]"
+          suppressHydrationWarning
+        >
+          {searchShortcutLabel}
         </kbd>
       </div>
 
