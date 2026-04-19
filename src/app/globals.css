@@ -14,8 +14,9 @@
   --pump-green-dim: rgba(61, 126, 212, 0.16);
   /* Nav row: active pill (pump-style, blue accent instead of mint) */
   --pump-nav-active-bg: #1a1a1a;
-  --pump-yellow: #edc706;
-  --pump-yellow-dim: rgba(237, 199, 6, 0.14);
+  /* Legacy token name; same darker blue as primary accent everywhere. */
+  --pump-yellow: var(--pump-green);
+  --pump-yellow-dim: var(--pump-green-dim);
   --background: var(--pump-bg);
   --foreground: var(--pump-text);
 }

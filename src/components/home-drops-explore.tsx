@@ -1,7 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
+
+import brokendrop from "@/components/brokendrop.png";
 import { DROP_COINS_UPDATED_EVENT, type CreatedCoinRecord } from "@/lib/created-coins-storage";
 import { devPreviewFromMint } from "@/lib/drop-coins";
 import { loadDropLaunchesForUi } from "@/lib/load-drop-launches";
@@ -44,24 +47,16 @@ export function HomeDropsExplore() {
   }, [rows]);
 
   return (
-    <section className="mt-16 w-full max-w-6xl border-t border-[var(--pump-border)] pt-12 text-left">
+    <section className="w-full text-left">
       <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-black tracking-tight text-white">Now trending</h2>
-          <p className="mt-1 text-sm text-[var(--pump-muted)]">
-            Highest mcap on drops (mint ends in <span className="font-mono text-[var(--pump-text)]">drop</span>). Excludes
-            official $drops.
-          </p>
+          <h2 className="text-2xl font-black tracking-tight text-white">Trending now</h2>
         </div>
-        <Link href="/create" className="btn-primary shrink-0 text-sm">
-          Create coin
-        </Link>
       </div>
 
       {trending.length === 0 ? (
         <p className="rounded-xl border border-dashed border-[var(--pump-border)] bg-[var(--pump-elevated)] px-4 py-8 text-center text-sm text-[var(--pump-muted)]">
-          No qualifying coins yet. Create one: new mints are generated until the address ends in{" "}
-          <span className="font-mono text-[var(--pump-text)]">drop</span>.
+          No coins have been created yet.
         </p>
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -99,9 +94,7 @@ export function HomeDropsExplore() {
       </div>
 
       {tab === "watchlist" ? (
-        <p className="mt-8 rounded-xl border border-[var(--pump-border)] bg-[var(--pump-elevated)] px-4 py-10 text-center text-sm text-[var(--pump-muted)]">
-          Watchlist coming soon (connect wallet).
-        </p>
+        <WatchlistEmpty onExplore={() => setTab("explore")} />
       ) : explore.length === 0 ? (
         <p className="mt-8 text-sm text-[var(--pump-muted)]">Nothing in explore yet.</p>
       ) : (
@@ -112,6 +105,33 @@ export function HomeDropsExplore() {
         </div>
       )}
     </section>
+  );
+}
+
+function WatchlistEmpty({ onExplore }: { onExplore: () => void }) {
+  return (
+    <div className="mt-2 flex flex-col items-center px-2 py-0 text-center sm:px-3">
+      <Image
+        src={brokendrop}
+        alt="Empty watchlist"
+        width={brokendrop.width}
+        height={brokendrop.height}
+        className="h-auto w-full max-w-[240px] object-contain sm:max-w-[260px]"
+        sizes="(max-width:640px) 240px, 260px"
+        priority={false}
+      />
+      <h2 className="mt-2 text-xl font-black tracking-tight text-white sm:text-2xl">Your watchlist is empty</h2>
+      <p className="mt-2 max-w-md text-pretty text-sm leading-relaxed text-white sm:text-base">
+        {"To add a coin to the watchlist, click the ☆ or 'Add to watchlist' buttons on a coin detail screen."}
+      </p>
+      <button
+        type="button"
+        onClick={onExplore}
+        className="mt-4 rounded-full bg-[var(--pump-green)] px-8 py-3 text-sm font-bold text-black transition hover:opacity-90 active:scale-[0.98]"
+      >
+        Explore coins
+      </button>
+    </div>
   );
 }
 
