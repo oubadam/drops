@@ -13,6 +13,27 @@ type Row = CreatedCoinRecord & { mcap: number | null };
 
 export type GlobalSearchLayout = "bar" | "icon";
 
+function getSearchShortcutKbdLabel(): string {
+  if (typeof window === "undefined") return "Ctrl+K";
+  const n = window.navigator;
+  const ua = (n.userAgent || "").toLowerCase();
+  const p = (n.platform || "").toLowerCase();
+  const uaData = (n as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform;
+  if (uaData === "macOS" || uaData === "iOS") return "⌘K";
+  if (
+    ua.includes("mac os x") ||
+    ua.includes("macintosh") ||
+    ua.includes("iphone") ||
+    ua.includes("ipad") ||
+    ua.includes("ipod") ||
+    ua.includes("like mac")
+  ) {
+    return "⌘K";
+  }
+  if (p.startsWith("mac") || p === "iphone" || p === "ipad" || p === "ipod") return "⌘K";
+  return "Ctrl+K";
+}
+
 export function GlobalSearch({ layout }: { layout: GlobalSearchLayout }) {
   const listboxId = useId();
   const [q, setQ] = useState("");
@@ -40,13 +61,7 @@ export function GlobalSearch({ layout }: { layout: GlobalSearchLayout }) {
     return () => window.removeEventListener(DROP_COINS_UPDATED_EVENT, run);
   }, [refreshRows]);
 
-  const searchShortcutLabel = useMemo(() => {
-    if (typeof navigator === "undefined") return "Ctrl+K";
-    const ua = navigator.userAgent;
-    const p = navigator.platform;
-    const isApple = /Mac|iPhone|iPad|iPod/i.test(ua) || p === "MacIntel";
-    return isApple ? "⌘K" : "Ctrl+K";
-  }, []);
+  const searchShortcutLabel = getSearchShortcutKbdLabel();
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -111,17 +126,17 @@ export function GlobalSearch({ layout }: { layout: GlobalSearchLayout }) {
           }}
           aria-label="Search"
           aria-expanded={open}
-          className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border bg-[var(--pump-surface)] text-white transition hover:border-white/15 ${
+          className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl border bg-[var(--pump-surface)] text-white transition hover:border-white/15 ${
             open ? "border-[var(--pump-green)] ring-1 ring-[var(--pump-green)]/25" : "border-[var(--pump-border)]"
           }`}
         >
-          <IconSearch className="h-[1.35rem] w-[1.35rem]" />
+          <IconSearch className="h-6 w-6" />
         </button>
 
         {open ? (
           <div
             id={listboxId}
-            className="fixed left-3 right-3 top-[calc(3.75rem+4px)] z-[60] flex max-h-[min(78vh,520px)] flex-col overflow-hidden rounded-xl border border-[var(--pump-border)] bg-[#141414] shadow-2xl shadow-black/60"
+            className="fixed left-3 right-3 top-[calc(4rem+4px)] z-[60] flex max-h-[min(78vh,520px)] flex-col overflow-hidden rounded-xl border border-[var(--pump-border)] bg-[var(--pump-elevated)] shadow-2xl shadow-black/60"
             role="listbox"
           >
             <div className="flex shrink-0 items-center gap-2 border-b border-[var(--pump-border)] px-3 py-2">
@@ -162,7 +177,7 @@ export function GlobalSearch({ layout }: { layout: GlobalSearchLayout }) {
   return (
     <div ref={wrapRef} className="relative mx-auto min-w-0 w-full max-w-2xl flex-1">
       <div
-        className={`flex h-11 items-center gap-2 rounded-xl border bg-[var(--pump-surface)] px-3 py-0 text-left text-sm transition sm:px-4 ${
+        className={`flex h-12 items-center gap-2 rounded-xl border bg-[var(--pump-surface)] px-3 py-0 text-left text-sm transition sm:px-4 ${
           open ? "border-[var(--pump-green)] ring-1 ring-[var(--pump-green)]/30" : "border-[var(--pump-border)]"
         }`}
       >
@@ -204,7 +219,7 @@ export function GlobalSearch({ layout }: { layout: GlobalSearchLayout }) {
       {open ? (
         <div
           id={listboxId}
-          className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[min(70vh,420px)] overflow-y-auto rounded-xl border border-[var(--pump-border)] bg-[#141414] py-1 shadow-2xl shadow-black/60"
+          className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[min(70vh,420px)] overflow-y-auto rounded-xl border border-[var(--pump-border)] bg-[var(--pump-elevated)] py-1 shadow-2xl shadow-black/60"
           role="listbox"
         >
           {results}

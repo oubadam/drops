@@ -54,7 +54,7 @@ function MobileItem({
   active: boolean;
   children: ReactNode;
 }) {
-  const cls = `${SLOT_BASE} text-white ${active ? "bg-[var(--pump-nav-active-bg)] hover:bg-[#1f1f1f]" : "hover:bg-white/[0.05]"}`;
+  const cls = `${SLOT_BASE} text-white ${active ? "bg-[var(--pump-nav-active-bg)] hover:bg-[var(--pump-nav-active-hover)]" : "hover:bg-white/[0.05]"}`;
   return (
     <Link href={href} className={cls} aria-label={label} aria-current={active ? "page" : undefined}>
       <span className={active ? "text-[var(--pump-green)]" : "text-white"}>{children}</span>

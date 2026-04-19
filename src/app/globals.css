@@ -2,18 +2,20 @@
 
 :root {
   --sidebar-w: 236px;
-  --pump-bg: #000000;
-  --pump-sidebar: #0a0a0a;
-  --pump-elevated: #0c0c0c;
-  --pump-surface: #111111;
-  --pump-surface-hover: #171717;
-  --pump-border: #1f1f1f;
+  /* Softer than pure black — closer to pump.fun-style charcoal */
+  --pump-bg: #121212;
+  --pump-sidebar: #141414;
+  --pump-elevated: #181818;
+  --pump-surface: #1e1e1e;
+  --pump-surface-hover: #262626;
+  --pump-border: #2e2e2e;
   --pump-text: #fafafa;
   --pump-muted: #a1a1aa;
   --pump-green: #3d7ed4;
   --pump-green-dim: rgba(61, 126, 212, 0.16);
   /* Nav row: active pill (pump-style, blue accent instead of mint) */
-  --pump-nav-active-bg: #1a1a1a;
+  --pump-nav-active-bg: #222222;
+  --pump-nav-active-hover: #2a2a2a;
   /* Legacy token name; same darker blue as primary accent everywhere. */
   --pump-yellow: var(--pump-green);
   --pump-yellow-dim: var(--pump-green-dim);

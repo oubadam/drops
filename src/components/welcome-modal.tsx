@@ -62,7 +62,7 @@ export function WelcomeModal() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="welcome-title"
-        className="relative w-full max-w-md overflow-hidden rounded-2xl border border-[var(--pump-border)] bg-[#0c0c0c] shadow-2xl shadow-black/60"
+        className="relative w-full max-w-md overflow-hidden rounded-2xl border border-[var(--pump-border)] bg-[var(--pump-elevated)] shadow-2xl shadow-black/60"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative w-full overflow-hidden border-b border-[var(--pump-border)]">
@@ -104,7 +104,7 @@ export function WelcomeModal() {
           <button
             type="button"
             onClick={dismiss}
-            className="w-full cursor-pointer select-none rounded-xl border border-black/10 bg-[var(--pump-green)] py-3.5 text-sm font-black text-white shadow-[0_2px_0_0_rgba(0,0,0,0.35)] transition-[opacity,box-shadow,transform] duration-150 hover:opacity-90 hover:shadow-[0_2px_0_0_rgba(0,0,0,0.45)] active:translate-y-px active:opacity-85 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pump-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0c0c]"
+            className="w-full cursor-pointer select-none rounded-xl border border-black/10 bg-[var(--pump-green)] py-3.5 text-sm font-black text-white shadow-[0_2px_0_0_rgba(0,0,0,0.35)] transition-[opacity,box-shadow,transform] duration-150 hover:opacity-90 hover:shadow-[0_2px_0_0_rgba(0,0,0,0.45)] active:translate-y-px active:opacity-85 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pump-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--pump-elevated)]"
           >
             Continue
           </button>

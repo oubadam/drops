@@ -109,7 +109,7 @@ export function PumpSidebar() {
               className={`flex items-center rounded-xl py-3 text-[15px] font-medium leading-snug text-white transition-colors ${
                 collapsed ? "w-11 justify-center px-0" : "gap-3.5 px-3"
               } ${
-                active ? "bg-[var(--pump-nav-active-bg)] hover:bg-[#1f1f1f]" : "hover:bg-white/[0.04]"
+                active ? "bg-[var(--pump-nav-active-bg)] hover:bg-[var(--pump-nav-active-hover)]" : "hover:bg-white/[0.04]"
               }`}
             >
               <Icon className={`h-[22px] w-[22px] shrink-0 ${active ? "text-[var(--pump-green)]" : "text-white"}`} />
