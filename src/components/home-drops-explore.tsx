@@ -110,18 +110,20 @@ export function HomeDropsExplore() {
 
 function WatchlistEmpty({ onExplore }: { onExplore: () => void }) {
   return (
-    <div className="mt-2 flex flex-col items-center px-2 py-0 text-center sm:px-3">
+    <div className="mt-2 flex w-full flex-col items-center px-2 py-0 text-center sm:px-3">
       <Image
         src={brokendrop}
         alt="Empty watchlist"
         width={brokendrop.width}
         height={brokendrop.height}
-        className="h-auto w-full max-w-[240px] object-contain sm:max-w-[260px]"
+        className="-mb-3 block h-auto w-full max-w-[240px] object-contain sm:-mb-4 sm:max-w-[260px]"
         sizes="(max-width:640px) 240px, 260px"
         priority={false}
       />
-      <h2 className="mt-2 text-xl font-black tracking-tight text-white sm:text-2xl">Your watchlist is empty</h2>
-      <p className="mt-2 max-w-md text-pretty text-sm leading-relaxed text-white sm:text-base">
+      <h2 className="mt-0 text-xl font-black tracking-tight text-white sm:whitespace-nowrap sm:text-2xl">
+        Your watchlist is empty
+      </h2>
+      <p className="mt-2 max-w-full text-sm leading-normal text-white sm:text-base lg:whitespace-nowrap">
         {"To add a coin to the watchlist, click the ☆ or 'Add to watchlist' buttons on a coin detail screen."}
       </p>
       <button

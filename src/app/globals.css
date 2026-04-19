@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --sidebar-w: 252px;
+  --sidebar-w: 236px;
   --pump-bg: #000000;
   --pump-sidebar: #0a0a0a;
   --pump-elevated: #0c0c0c;

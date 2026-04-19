@@ -19,16 +19,12 @@ export function PumpMobileNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 flex min-h-14 flex-col border-t border-[var(--pump-border)] bg-[var(--pump-sidebar)] pb-[env(safe-area-inset-bottom,0px)] sm:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 flex min-h-14 flex-col border-t border-[var(--pump-border)] bg-[var(--pump-sidebar)] pb-[env(safe-area-inset-bottom,0px)] md:hidden"
       aria-label="Main navigation"
     >
       <div className="grid h-14 w-full grid-cols-4 place-items-center px-1">
         <MobileItem href="/" label="Home" active={pathname === "/"}>
           <IconHomeOutline className={ICON} />
-        </MobileItem>
-
-        <MobileItem href="/create" label="Create" active={pathname === "/create"}>
-          <IconPlusInCircle className={ICON} />
         </MobileItem>
 
         <MobileItem href="/profile" label="Profile" active={pathname === "/profile"}>
@@ -37,6 +33,10 @@ export function PumpMobileNav() {
 
         <MobileItem href="/docs" label="Docs" active={pathname === "/docs" || pathname.startsWith("/docs/")}>
           <IconDocOutline className={ICON} />
+        </MobileItem>
+
+        <MobileItem href="/create" label="Create" active={pathname === "/create"}>
+          <IconPlusInCircle className={ICON} />
         </MobileItem>
       </div>
     </nav>
