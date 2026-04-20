@@ -79,13 +79,19 @@ export function ExploreViewSettings({ value, onChange }: Props) {
           role="dialog"
           aria-label="View layout"
         >
-          <div className="flex rounded-full bg-[var(--pump-surface)] p-0.5">
+          <div className="relative flex w-[170px] rounded-full bg-[var(--pump-surface)] p-0.5">
+            <span
+              aria-hidden
+              className={`pointer-events-none absolute bottom-0.5 top-0.5 z-0 w-[calc(50%-2px)] rounded-full border border-white/10 bg-[#2a2e35] shadow-sm transition-transform duration-250 ease-out ${
+                value === "table" ? "translate-x-full" : "translate-x-0"
+              }`}
+            />
             <button
               type="button"
               onClick={() => pick("grid")}
-              className={`flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold transition sm:text-[13px] ${
+              className={`relative z-10 flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2 py-2 text-xs font-bold transition-colors duration-200 sm:text-[13px] ${
                 value === "grid"
-                  ? "bg-black text-white shadow-sm"
+                  ? "text-white"
                   : "text-[var(--pump-muted)] hover:text-[var(--pump-text)]"
               }`}
             >
@@ -95,9 +101,9 @@ export function ExploreViewSettings({ value, onChange }: Props) {
             <button
               type="button"
               onClick={() => pick("table")}
-              className={`flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold transition sm:text-[13px] ${
+              className={`relative z-10 flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2 py-2 text-xs font-bold transition-colors duration-200 sm:text-[13px] ${
                 value === "table"
-                  ? "bg-black text-white shadow-sm"
+                  ? "text-white"
                   : "text-[var(--pump-muted)] hover:text-[var(--pump-text)]"
               }`}
             >

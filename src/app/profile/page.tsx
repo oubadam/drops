@@ -3,43 +3,92 @@
 import Link from "next/link";
 import { startTransition, useEffect, useState } from "react";
 import { PROFILE_USERNAME_KEY, type CreatedCoinRecord, loadCreatedCoins } from "@/lib/created-coins-storage";
+import { clearExternalWalletAddress } from "@/lib/external-wallet-session";
+import { isPrivyConfigured } from "@/lib/privy-config";
+import { useLogout, usePrivy } from "@privy-io/react-auth";
+import { useRouter } from "next/navigation";
+import { getExternalWalletAddress } from "@/lib/external-wallet-session";
+import { defaultUsernameFromWallet, fetchProfile, fetchWalletBalance, saveProfile, type PersistedProfile } from "@/lib/profile-api";
+import Image from "next/image";
+import defaultPfp from "@/components/dropspfps.png";
 
 const tabs = ["Balances", "Coins", "Creator Rewards", "Replies", "Notifications", "Followers"] as const;
 
 export default function ProfilePage() {
   const [tab, setTab] = useState<(typeof tabs)[number]>("Balances");
-  const [username, setUsername] = useState("Guest");
+  const [username, setUsername] = useState(() => {
+    if (typeof window === "undefined") return "Guest";
+    return window.localStorage.getItem(PROFILE_USERNAME_KEY) || "Guest";
+  });
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState("");
+  const [draftBio, setDraftBio] = useState("");
+  const [draftAvatarUrl, setDraftAvatarUrl] = useState("");
   const [coins, setCoins] = useState<CreatedCoinRecord[]>([]);
+  const [walletAddress] = useState<string | null>(() => (typeof window === "undefined" ? null : getExternalWalletAddress()));
+  const [profile, setProfile] = useState<PersistedProfile | null>(null);
+  const [balanceUsd, setBalanceUsd] = useState(0);
+  const [balanceSol, setBalanceSol] = useState(0);
 
   useEffect(() => {
-    startTransition(() => {
-      setCoins(loadCreatedCoins());
-      const u = window.localStorage.getItem(PROFILE_USERNAME_KEY);
-      if (u) setUsername(u);
-    });
-  }, []);
+    const wallet = walletAddress;
+    startTransition(() => setCoins(loadCreatedCoins()));
+    if (!wallet) return;
+    void Promise.all([fetchProfile(wallet), fetchWalletBalance(wallet)])
+      .then(([p, b]) => {
+        setProfile(p);
+        setUsername(p.username);
+        setDraftName(p.username);
+        setDraftBio(p.bio);
+        setDraftAvatarUrl(p.avatarUrl);
+        setBalanceUsd(b.usd);
+        setBalanceSol(b.sol);
+      })
+      .catch(() => {
+        setUsername(defaultUsernameFromWallet(wallet));
+      });
+  }, [walletAddress]);
 
-  function saveUsername() {
-    const next = draftName.trim() || "Guest";
+  async function saveUsername() {
+    const next = draftName.trim() || (walletAddress ? defaultUsernameFromWallet(walletAddress) : "Guest");
     setUsername(next);
     window.localStorage.setItem(PROFILE_USERNAME_KEY, next);
+    if (walletAddress) {
+      const saved = await saveProfile({
+        walletAddress,
+        username: next,
+        bio: draftBio.trim(),
+        avatarUrl: draftAvatarUrl.trim(),
+      });
+      setProfile(saved);
+    }
     setEditing(false);
   }
 
-  const walletPreview = "Connect wallet (placeholder)";
+  const walletPreview = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : "Connect wallet";
 
   return (
     <div className="space-y-8 px-1 pb-20 lg:pr-2">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 gap-4">
-          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full border border-[var(--pump-border)] bg-[var(--pump-surface)] text-xl font-black text-[var(--pump-green)] ring-2 ring-[var(--pump-yellow)]/25 ring-offset-2 ring-offset-[var(--pump-bg)]">
-            {username.slice(0, 1).toUpperCase()}
+          <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full border border-[var(--pump-border)] bg-[var(--pump-surface)] ring-2 ring-[var(--pump-yellow)]/25 ring-offset-2 ring-offset-[var(--pump-bg)]">
+            <Image
+              src={profile?.avatarUrl || defaultPfp}
+              alt="profile avatar"
+              width={64}
+              height={64}
+              className="h-16 w-16 object-cover"
+              unoptimized={Boolean(profile?.avatarUrl?.startsWith("data:"))}
+            />
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-black tracking-tight">{username}</h1>
             <p className="mt-1 font-mono text-xs text-[var(--pump-muted)]">{walletPreview}</p>
+            {walletAddress ? (
+              <p className="mt-1 text-xs text-[var(--pump-muted)]">
+                <span className="font-semibold text-[var(--pump-text)]">$ {balanceUsd.toFixed(2)}</span> · {balanceSol.toFixed(4)} SOL
+              </p>
+            ) : null}
             <p className="mt-1 text-xs">
               <a
                 href={coins[0] ? `https://solscan.io/account/${coins[0].mint}` : "https://solscan.io/"}
@@ -72,6 +121,7 @@ export default function ProfilePage() {
                 className="field max-w-[200px] text-sm"
                 placeholder="Username"
               />
+              <input value={draftBio} onChange={(e) => setDraftBio(e.target.value)} className="field max-w-[220px] text-sm" placeholder="Bio" />
               <button type="button" onClick={saveUsername} className="btn-primary text-sm">
                 Save
               </button>
@@ -91,6 +141,7 @@ export default function ProfilePage() {
               Edit profile
             </button>
           )}
+          {isPrivyConfigured ? <PrivyLogoutButton /> : <LocalLogoutButton />}
         </div>
       </div>
 
@@ -197,4 +248,56 @@ function timeAgo(iso: string) {
   if (d <= 0) return "today";
   if (d === 1) return "1d ago";
   return `${d}d ago`;
+}
+
+function LocalLogoutButton() {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() => {
+        setPending(true);
+        clearExternalWalletAddress();
+        router.push("/");
+        router.refresh();
+      }}
+      className="btn-ghost text-sm text-red-300 hover:text-red-200 disabled:opacity-60"
+    >
+      {pending ? "Logging out..." : "Logout"}
+    </button>
+  );
+}
+
+function PrivyLogoutButton() {
+  const router = useRouter();
+  const { logout } = useLogout();
+  const { authenticated } = usePrivy();
+  const [pending, setPending] = useState(false);
+
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={async () => {
+        if (pending) return;
+        setPending(true);
+        try {
+          clearExternalWalletAddress();
+          if (authenticated) {
+            await logout();
+          }
+        } finally {
+          router.push("/");
+          router.refresh();
+          setPending(false);
+        }
+      }}
+      className="btn-ghost text-sm text-red-300 hover:text-red-200 disabled:opacity-60"
+    >
+      {pending ? "Logging out..." : "Logout"}
+    </button>
+  );
 }

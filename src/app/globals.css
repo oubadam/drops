@@ -133,3 +133,28 @@ body {
   background: var(--pump-bg);
   box-sizing: border-box;
 }
+
+/* Dark scrollbar style (track + muted thumb), matching app theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #5b5f66 #1a1d22;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #1a1d22;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: #5b5f66;
+  border: 1px solid #1a1d22;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #6d727a;
+}

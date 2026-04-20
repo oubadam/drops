@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useLogout, usePrivy } from "@privy-io/react-auth";
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { useOpenSignIn } from "@/components/sign-in-modal-context";
+import { getExternalWalletAddress, subscribeExternalWallet } from "@/lib/external-wallet-session";
 
 const SESSION_BOOTSTRAP_LOGOUT_KEY = "drop_privy_bootstrap_logout_v1";
 
@@ -29,6 +30,11 @@ export function PumpTopBarAuthPrivy({ expanded }: { expanded: boolean }) {
   const { ready, authenticated, user } = usePrivy();
   const { logout } = useLogout();
   const { openSignIn } = useOpenSignIn();
+  const externalWalletAddress = useSyncExternalStore(
+    subscribeExternalWallet,
+    getExternalWalletAddress,
+    () => null,
+  );
 
   useEffect(() => {
     if (!ready || !authenticated || typeof window === "undefined") return;
@@ -46,13 +52,13 @@ export function PumpTopBarAuthPrivy({ expanded }: { expanded: boolean }) {
     );
   }
 
-  if (!authenticated) {
+  if (!authenticated && !externalWalletAddress) {
     if (expanded) {
       return (
         <button
           type="button"
           onClick={openSignIn}
-          className="inline-flex h-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#7ee8c8] px-6 text-sm font-semibold text-black shadow-sm transition hover:brightness-95 active:brightness-90"
+          className="inline-flex h-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#3b82f6] px-6 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 active:brightness-90"
         >
           Sign in
         </button>
@@ -62,14 +68,14 @@ export function PumpTopBarAuthPrivy({ expanded }: { expanded: boolean }) {
       <button
         type="button"
         onClick={openSignIn}
-        className="inline-flex h-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#7ee8c8] px-4 text-xs font-semibold text-black shadow-sm transition hover:brightness-95 active:brightness-90"
+        className="inline-flex h-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#3b82f6] px-4 text-xs font-semibold text-white shadow-sm transition hover:brightness-95 active:brightness-90"
       >
         Sign in
       </button>
     );
   }
 
-  const label = user ? displayName(user) : "Profile";
+  const label = user ? displayName(user) : externalWalletAddress ? truncateAddr(externalWalletAddress) : "Profile";
 
   if (expanded) {
     return (
@@ -107,7 +113,7 @@ export function PumpTopBarAuthLegacy({ expanded }: { expanded: boolean }) {
       <button
         type="button"
         onClick={openSignIn}
-        className="inline-flex h-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#7ee8c8] px-6 text-sm font-semibold text-black shadow-sm transition hover:brightness-95"
+        className="inline-flex h-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#3b82f6] px-6 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
       >
         Sign in
       </button>
@@ -117,7 +123,7 @@ export function PumpTopBarAuthLegacy({ expanded }: { expanded: boolean }) {
     <button
       type="button"
       onClick={openSignIn}
-      className="inline-flex h-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#7ee8c8] px-4 text-xs font-semibold text-black shadow-sm transition hover:brightness-95"
+      className="inline-flex h-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#3b82f6] px-4 text-xs font-semibold text-white shadow-sm transition hover:brightness-95"
     >
       Sign in
     </button>
