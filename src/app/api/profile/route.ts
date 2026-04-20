@@ -11,6 +11,13 @@ function defaultUsername(wallet: string) {
   return `@${wallet.slice(0, 6)}`;
 }
 
+const USERNAME_RULES_ERROR =
+  "Username must start and end with a letter or number, can contain periods, underscores and hyphens (but not consecutively), and no special characters at the beginning or end";
+
+function isValidUsername(username: string): boolean {
+  return /^(?=.{1,15}$)(?!.*[._-]{2})[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(username);
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const wallet = (searchParams.get("wallet") ?? "").trim();
@@ -42,11 +49,11 @@ export async function PUT(request: Request) {
   if (!walletAddress || !isWalletAddress(walletAddress)) {
     return NextResponse.json({ error: "invalid_wallet" }, { status: 400 });
   }
-  const username = (body.username ?? "").trim().slice(0, 24);
+  const username = (body.username ?? "").trim().slice(0, 15);
   const bio = (body.bio ?? "").trim().slice(0, 280);
   const avatarUrl = (body.avatarUrl ?? "").trim();
-  if (!username) {
-    return NextResponse.json({ error: "invalid_username" }, { status: 400 });
+  if (!username || !isValidUsername(username)) {
+    return NextResponse.json({ error: "invalid_username", message: USERNAME_RULES_ERROR }, { status: 400 });
   }
   const saved = await upsertDropProfile({
     walletAddress,

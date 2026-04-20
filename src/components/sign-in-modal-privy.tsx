@@ -32,9 +32,14 @@ export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [copiedToastVisible, setCopiedToastVisible] = useState(false);
+  const [copiedToastEntered, setCopiedToastEntered] = useState(false);
   const [editName, setEditName] = useState("");
   const [editBio, setEditBio] = useState("");
   const [editAvatarDataUrl, setEditAvatarDataUrl] = useState<string>("");
+  const [profileErrorVisible, setProfileErrorVisible] = useState(false);
+  const [profileErrorEntered, setProfileErrorEntered] = useState(false);
+  const [profileErrorMessage, setProfileErrorMessage] = useState("");
   const { login } = useLogin({
     onComplete: () => onClose(),
   });
@@ -105,16 +110,26 @@ export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
 
   async function onSaveProfile() {
     if (!connectedWallet) return;
+    const trimmedUsername = editName.trim().replace(/^@+/, "");
+    const usernameValid = /^(?=.{1,15}$)(?!.*[._-]{2})[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(trimmedUsername);
+    if (!usernameValid) {
+      showProfileError(
+        "Username must start and end with a letter or number, can contain periods, underscores and hyphens (but not consecutively), and no special characters at the beginning or end",
+      );
+      return;
+    }
     setSavingProfile(true);
     try {
       const next = await saveProfile({
         walletAddress: connectedWallet,
-        username: editName.trim() || defaultUsernameFromWallet(connectedWallet),
+        username: trimmedUsername || defaultUsernameFromWallet(connectedWallet).replace(/^@+/, ""),
         bio: editBio.trim(),
         avatarUrl: editAvatarDataUrl.trim(),
       });
       setProfile(next);
       setEditOpen(false);
+    } catch (e) {
+      showProfileError(e instanceof Error ? e.message : "Error updating profile");
     } finally {
       setSavingProfile(false);
     }
@@ -135,6 +150,29 @@ export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
     setMoreOpen(false);
   }
 
+  function triggerCopiedToast() {
+    setCopiedToastVisible(true);
+    setCopiedToastEntered(false);
+    window.setTimeout(() => setCopiedToastEntered(true), 10);
+    window.setTimeout(() => setCopiedToastEntered(false), 2200);
+    window.setTimeout(() => {
+      setCopiedToastVisible(false);
+      setCopiedToastEntered(false);
+    }, 3000);
+  }
+
+  function showProfileError(message: string) {
+    setProfileErrorMessage(message);
+    setProfileErrorVisible(true);
+    setProfileErrorEntered(false);
+    window.setTimeout(() => setProfileErrorEntered(true), 10);
+    window.setTimeout(() => setProfileErrorEntered(false), 2200);
+    window.setTimeout(() => {
+      setProfileErrorVisible(false);
+      setProfileErrorEntered(false);
+    }, 3000);
+  }
+
   return (
     <div
       className="fixed inset-0 z-[190] flex items-center justify-center bg-black/75 p-4 backdrop-blur-[2px]"
@@ -145,10 +183,24 @@ export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-label="Sign in"
-        className="relative flex w-full max-w-[21rem] flex-col overflow-hidden rounded-2xl border border-white/70 bg-[#101318] font-sans shadow-2xl shadow-black/70"
+        className="relative flex w-full max-w-[23rem] flex-col overflow-hidden rounded-2xl border border-white/70 bg-[#101318] font-sans shadow-2xl shadow-black/70"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative px-4 pb-2.5 pt-3.5">
+          {connectingPhase ? (
+            <button
+              type="button"
+              aria-label="Back"
+              onClick={() => {
+                setConnectingPhase(null);
+                setConnectingWalletLabel(null);
+                setWalletLoginHint(null);
+              }}
+              className="absolute left-2.5 top-2.5 grid h-6 w-6 cursor-pointer place-items-center rounded-full border border-white/15 bg-white/5 text-xs text-zinc-400 transition hover:bg-white/10 hover:text-white active:scale-95"
+            >
+              ←
+            </button>
+          ) : null}
           <button
             type="button"
             className="absolute right-2.5 top-2.5 grid h-6 w-6 cursor-pointer place-items-center rounded-full border border-white/15 bg-white/5 text-xs text-zinc-400 transition hover:bg-white/10 hover:text-white active:scale-95"
@@ -188,11 +240,12 @@ export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
               usd={usd}
               sol={sol}
               onEdit={() => {
-                setEditName(profile.username);
+                setEditName(profile.username.replace(/^@+/, ""));
                 setEditBio(profile.bio);
                 setEditAvatarDataUrl(profile.avatarUrl);
                 setEditOpen(true);
               }}
+              onCopiedAddress={triggerCopiedToast}
               onDisconnect={onDisconnect}
             />
           ) : null}
@@ -294,6 +347,8 @@ export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
           onSave={onSaveProfile}
         />
       ) : null}
+      {copiedToastVisible ? <CopiedAddressToast entered={copiedToastEntered} /> : null}
+      {profileErrorVisible ? <ProfileErrorToast entered={profileErrorEntered} message={profileErrorMessage} /> : null}
     </div>
   );
 }
@@ -338,21 +393,21 @@ function IconWallet({ className }: { className?: string }) {
 
 function WalletConnectingCard({ phase, walletLabel }: { phase: "connecting" | "confirming"; walletLabel: string }) {
   return (
-    <div className="rounded-2xl border border-white/15 bg-[#0f131a] p-5 text-center">
-      <h3 className="text-lg font-semibold text-white">Sign message</h3>
-      <div className="mt-4 flex justify-center">
+    <div className="rounded-2xl bg-[#0f131a] p-5 text-center">
+      <h3 className="mb-2 text-lg font-semibold text-white">Sign message</h3>
+      <div className="mt-1 flex justify-center">
         <Image
           src={normaldrop}
           alt="drops logo"
           width={normaldrop.width}
           height={normaldrop.height}
-          className="h-16 w-auto object-contain"
+          className="h-24 w-auto object-contain"
           priority
         />
       </div>
       <div className="mt-5 flex items-center justify-center gap-2 whitespace-nowrap text-[1.1rem] text-white">
         <span>{phase === "confirming" ? "Click confirm in your wallet" : `Connecting ${walletLabel}...`}</span>
-        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[#59d79a] border-t-transparent" />
+        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[#3b82f6] border-t-transparent" />
       </div>
       <p className="mt-2 text-sm text-zinc-400">This proves wallet ownership</p>
     </div>
@@ -366,28 +421,32 @@ function ConnectedWalletCard(props: {
   usd: number;
   sol: number;
   onEdit: () => void;
+  onCopiedAddress: () => void;
   onDisconnect: () => void;
 }) {
-  const { username, wallet, avatarSrc, usd, sol, onEdit, onDisconnect } = props;
-  const shownName = username || `@${wallet.slice(0, 6)}`;
-  const shownUsd = usd > 0 ? Number(usd.toFixed(2)).toString() : "0";
+  const { username, wallet, avatarSrc, usd, sol, onEdit, onCopiedAddress, onDisconnect } = props;
+  const shownName = username ? (username.startsWith("@") ? username : `@${username}`) : `@${wallet.slice(0, 6)}`;
+  const shownUsd = usd.toFixed(2);
 
   function copyAddress() {
     if (typeof navigator === "undefined" || !navigator.clipboard) return;
-    void navigator.clipboard.writeText(wallet);
+    void navigator.clipboard.writeText(wallet).then(onCopiedAddress);
   }
 
   return (
-    <div className="rounded-2xl border border-white/15 bg-[#0f131a] p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-[2rem] font-semibold leading-none text-white">{shownName}</p>
-        <button type="button" onClick={onDisconnect} className="text-zinc-400 hover:text-white">
-          ✕
+    <div className="px-2 pb-2 pt-2">
+      <div className="text-center">
+        <p className="text-[1rem] font-semibold leading-none text-white">{shownName}</p>
+      </div>
+      <div className="mt-3 flex justify-center">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="cursor-pointer rounded-xl bg-white/10 px-4 py-1.5 text-[0.95rem] font-semibold text-white transition hover:bg-white/15"
+        >
+          Edit profile
         </button>
       </div>
-      <button type="button" onClick={onEdit} className="mt-3 rounded-xl bg-white/10 px-4 py-2 text-[1.45rem] font-semibold text-white">
-        Edit profile
-      </button>
       <div className="mt-6 flex items-center justify-center gap-4">
         <Image
           src={avatarSrc}
@@ -398,36 +457,68 @@ function ConnectedWalletCard(props: {
           unoptimized={typeof avatarSrc === "string" && avatarSrc.startsWith("data:")}
         />
         <div className="text-left leading-none">
-          <p className="text-[2.15rem] text-white">{shownUsd}</p>
-          <p className="mt-2 text-sm text-zinc-400">{sol.toFixed(4)} SOL</p>
+          <p className="text-[0.95rem] font-bold text-zinc-300">$ {shownUsd}</p>
+          <p className="mt-1 text-sm text-zinc-400">{sol.toFixed(2)} SOL</p>
         </div>
       </div>
       <div className="mt-4 flex items-center justify-center gap-2 text-center">
         <p className="font-mono text-sm text-zinc-300">
           {wallet.slice(0, 4)}...{wallet.slice(-4)}
         </p>
-        <button type="button" onClick={copyAddress} className="text-zinc-400 hover:text-white" aria-label="Copy wallet address">
-          ⧉
+        <button
+          type="button"
+          onClick={copyAddress}
+          className="grid h-5 w-5 cursor-pointer place-items-center rounded-sm border border-white/15 bg-[#121821] text-zinc-300 transition hover:text-white"
+          aria-label="Copy wallet address"
+        >
+          <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="9" y="9" width="11" height="11" rx="2" />
+            <path d="M5 15V6a2 2 0 0 1 2-2h9" />
+          </svg>
         </button>
       </div>
-      <button type="button" className="mt-5 w-full rounded-2xl border border-[#405a82] bg-[#0f1521] px-4 py-3 text-left text-white">
-        <span className="flex items-start justify-between">
-          <span className="mr-3 mt-0.5 inline-grid h-6 w-6 place-items-center rounded-md border border-white/30 text-sm">◫</span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[2rem] font-semibold leading-none">transfer from wallet</span>
-            <span className="mt-1 block text-sm text-zinc-400">no limits • instant</span>
-          </span>
-          <img src="https://cdn.jsdelivr.net/npm/solana-icons@latest/svg/wallets/phantom.svg" alt="" className="ml-2 h-6 w-6 rounded-md object-contain" />
-        </span>
-      </button>
-      <div className="my-4 flex items-center gap-2 text-zinc-500">
-        <div className="h-px flex-1 bg-white/20" />
-        <span>or</span>
-        <div className="h-px flex-1 bg-white/20" />
-      </div>
-      <button type="button" onClick={onDisconnect} className="w-full rounded-xl bg-white/20 py-2 text-[2rem] text-white">
+      <button
+        type="button"
+        onClick={onDisconnect}
+        className="mt-5 w-full cursor-pointer rounded-xl bg-white/20 py-2 text-[0.9rem] font-medium text-white transition hover:bg-white/25"
+      >
         Disconnect wallet
       </button>
+    </div>
+  );
+}
+
+function CopiedAddressToast({ entered }: { entered: boolean }) {
+  return (
+    <div
+      className={`pointer-events-none fixed left-1/2 top-4 z-[260] w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-[#3b82f6] bg-[#0b1018]/95 px-4 py-3 text-center transition-all duration-700 ease-in-out ${
+        entered ? "translate-y-4 opacity-100" : "-translate-y-3 opacity-0"
+      }`}
+      role="status"
+      aria-live="polite"
+    >
+      <p className="flex items-center justify-center gap-2 text-sm font-semibold text-white">
+        <span className="inline-grid h-4 w-4 place-items-center rounded-full bg-[#3b82f6] text-[11px] leading-none text-white">✓</span>
+        <span>Copied Wallet Address!</span>
+      </p>
+    </div>
+  );
+}
+
+function ProfileErrorToast({ entered, message }: { entered: boolean; message: string }) {
+  return (
+    <div
+      className={`pointer-events-none fixed left-1/2 top-4 z-[261] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-red-500 bg-black/95 px-5 py-4 transition-all duration-700 ease-in-out ${
+        entered ? "translate-y-4 opacity-100" : "-translate-y-3 opacity-0"
+      }`}
+      role="alert"
+      aria-live="assertive"
+    >
+      <p className="text-lg font-semibold text-zinc-100">Error updating profile</p>
+      <div className="mt-2 flex items-start gap-2 text-zinc-100">
+        <span className="mt-0.5 inline-grid h-4 w-4 place-items-center rounded-full bg-zinc-200 text-[11px] font-bold leading-none text-black">!</span>
+        <p className="text-[1.02rem] leading-snug">{message}</p>
+      </div>
     </div>
   );
 }
@@ -452,36 +543,57 @@ function EditProfileModal(props: {
         className="relative w-full max-w-[420px] rounded-2xl border border-white/15 bg-[#0f131a] p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <button type="button" onClick={onClose} className="absolute right-4 top-4 text-xl text-zinc-400">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close edit profile"
+          className="absolute right-4 top-4 cursor-pointer text-xl text-zinc-400 transition hover:text-white"
+        >
           ✕
         </button>
-        <h3 className="text-center text-[2rem] font-semibold text-white">Choose your username</h3>
-        <div className="mt-5 flex items-end gap-2">
-          <Image src={avatarSrc} alt="avatar" width={72} height={72} className="h-[72px] w-[72px] rounded-full object-cover" unoptimized={avatarSrc.startsWith("data:")} />
-          <label className="grid h-8 w-8 cursor-pointer place-items-center rounded-md bg-white/15 text-white">
-            📷
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => onPickAvatar(e.target.files?.[0] ?? null)} />
-          </label>
+        <h3 className="text-center text-[1.6rem] font-semibold text-white">Edit profile</h3>
+        <div className="mt-5">
+          <div className="relative inline-block">
+            <Image
+              src={avatarSrc}
+              alt="avatar"
+              width={72}
+              height={72}
+              className="h-[72px] w-[72px] rounded-full border border-[#6b7280] object-cover"
+              unoptimized={avatarSrc.startsWith("data:")}
+            />
+            <label className="absolute -bottom-1 -right-1 grid h-7 w-7 cursor-pointer place-items-center rounded-md border border-[#d1d5db] bg-[#f4f4f5] text-black">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 7h3l1.2-2h7.6L17 7h3v11H4z" />
+                <circle cx="12" cy="13" r="3.2" />
+              </svg>
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => onPickAvatar(e.target.files?.[0] ?? null)} />
+            </label>
+          </div>
         </div>
         <p className="mt-5 text-sm text-zinc-400">
           Username <span className="text-red-400">*</span>
         </p>
-        <input value={username} onChange={(e) => onUsername(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none" />
+        <input
+          value={username}
+          onChange={(e) => onUsername(e.target.value.slice(0, 15))}
+          className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-white outline-none transition focus:border-[#3b82f6]"
+        />
         <p className="mt-3 text-sm text-zinc-500">You can change your username once every day</p>
         <p className="mt-6 text-sm text-zinc-400">Bio</p>
         <textarea
           value={bio}
           onChange={(e) => onBio(e.target.value)}
           placeholder="Describe your profile"
-          rows={4}
-          className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+          rows={2}
+          className="mt-2 min-h-[56px] w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition focus:border-[#3b82f6]"
         />
         <div className="mt-5 flex justify-end">
           <button
             type="button"
             disabled={saving}
             onClick={onSave}
-            className="rounded-2xl bg-[#72f2a7] px-8 py-3 text-lg font-semibold text-black disabled:opacity-60"
+            className="rounded-2xl bg-[#3b82f6] px-6 py-2.5 text-base font-semibold text-white disabled:opacity-60"
           >
             {saving ? "Saving..." : "Save"}
           </button>

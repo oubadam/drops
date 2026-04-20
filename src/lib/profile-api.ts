@@ -31,7 +31,10 @@ export async function saveProfile(input: PersistedProfile): Promise<PersistedPro
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  if (!res.ok) throw new Error("profile_save_failed");
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { message?: string; error?: string } | null;
+    throw new Error(body?.message || "profile_save_failed");
+  }
   const json = (await res.json()) as { profile: PersistedProfile };
   return json.profile;
 }
