@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import normaldrop from "@/components/normaldrop.png";
 import { GlobalSearch } from "@/components/global-search";
+import { PumpTopBarAuthLegacy, PumpTopBarAuthPrivy } from "@/components/pump-top-bar-auth";
+import { isPrivyConfigured } from "@/lib/privy-config";
 
 export function PumpMainTopBar() {
   return (
@@ -17,7 +19,7 @@ export function PumpMainTopBar() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <CreateNavButton expanded />
-          <ProfileBlock expanded />
+          {isPrivyConfigured ? <PumpTopBarAuthPrivy expanded /> : <PumpTopBarAuthLegacy expanded />}
         </div>
       </div>
 
@@ -45,7 +47,7 @@ export function PumpMainTopBar() {
         <div className="flex shrink-0 items-center gap-2">
           <GlobalSearch layout="icon" />
           <CreateNavButton expanded={false} />
-          <ProfileCompact />
+          {isPrivyConfigured ? <PumpTopBarAuthPrivy expanded={false} /> : <PumpTopBarAuthLegacy expanded={false} />}
         </div>
       </div>
     </header>
@@ -70,37 +72,6 @@ function CreateNavButton({ expanded }: { expanded: boolean }) {
       className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-[var(--pump-border)] bg-[var(--pump-surface)] text-white transition hover:border-white/15"
     >
       <IconPlus className="pointer-events-none h-6 w-6" />
-    </Link>
-  );
-}
-
-function ProfileCompact() {
-  return (
-    <Link
-      href="/profile"
-      aria-label="Profile"
-      className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-[var(--pump-border)] bg-[var(--pump-surface)] text-xs font-bold text-[var(--pump-muted)] transition hover:border-[var(--pump-green)]/40"
-    >
-      ?
-    </Link>
-  );
-}
-
-function ProfileBlock({ expanded }: { expanded: boolean }) {
-  if (!expanded) return null;
-  return (
-    <Link
-      href="/profile"
-      className="flex h-12 shrink-0 items-center gap-2 rounded-full border border-[var(--pump-border)] bg-[var(--pump-surface)] py-0 pl-2 pr-2 text-left text-xs transition hover:border-[var(--pump-green)]/40"
-    >
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--pump-border)] text-[10px] font-bold text-[var(--pump-muted)]">
-        ?
-      </span>
-      <span className="hidden min-w-0 flex-col justify-center gap-px leading-none md:flex">
-        <span className="font-medium leading-tight text-[var(--pump-text)]">Profile</span>
-        <span className="text-[10px] leading-tight text-[var(--pump-muted)]">0.00 SOL</span>
-      </span>
-      <span className="shrink-0 text-[var(--pump-muted)]">▾</span>
     </Link>
   );
 }

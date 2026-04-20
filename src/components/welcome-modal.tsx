@@ -8,33 +8,35 @@ import { startTransition, useEffect, useState } from "react";
 import dropBanner from "./dropban.png";
 
 const STORAGE_KEY = "drop_welcome_dismissed_v2";
+/** Set when this tab has visited any route other than `/` — return visits to home should not reopen the welcome. */
+const SESSION_SEEN_NON_HOME_KEY = "drop_welcome_seen_non_home_v1";
 
 export function WelcomeModal() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const isDocsRoute = pathname === "/docs" || pathname.startsWith("/docs/");
-  const isHome = pathname === "/";
-
   useEffect(() => {
     startTransition(() => {
       if (typeof window === "undefined") return;
-
-      if (isDocsRoute) {
-        window.localStorage.setItem(STORAGE_KEY, "1");
+      const path = pathname ?? "";
+      if (path !== "/" && path !== "") {
+        window.sessionStorage.setItem(SESSION_SEEN_NON_HOME_KEY, "1");
+      }
+      if (path !== "/") {
         setOpen(false);
         return;
       }
-
-      if (!isHome) {
+      if (window.localStorage.getItem(STORAGE_KEY)) {
         setOpen(false);
         return;
       }
-
-      if (!window.localStorage.getItem(STORAGE_KEY)) setOpen(true);
-      else setOpen(false);
+      if (window.sessionStorage.getItem(SESSION_SEEN_NON_HOME_KEY)) {
+        setOpen(false);
+        return;
+      }
+      setOpen(true);
     });
-  }, [isDocsRoute, isHome]);
+  }, [pathname]);
 
   useEffect(() => {
     if (!open) return;
@@ -96,7 +98,7 @@ export function WelcomeModal() {
           <span className="text-[var(--pump-green)]">drops</span> does it differently: devs must specify the wallets to recieve tokens as an airdrop, before the token is launched.
           
           </p>
-          <h2 id="welcome-title" className="text-1xl font-black tracking-tight text-white">
+          <h2 className="text-1xl font-black tracking-tight text-white">
             while other devs promise an airdrop, <span className="text-[var(--pump-green)]">drops</span> has already done it.  
           </h2>
           

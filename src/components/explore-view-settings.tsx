@@ -137,10 +137,13 @@ function IconGrid({ className }: { className?: string }) {
 }
 
 function IconTable({ className }: { className?: string }) {
+  /** List / table: hollow bullet + rounded bar per row (matches product table icon). */
   return (
-    <svg className={className} fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth={1.4} aria-hidden>
-      <path strokeLinecap="round" d="M2 4h12M2 8h12M2 12h8" />
-      <circle cx="12.5" cy="12" r="1.1" fill="currentColor" stroke="none" />
+    <svg className={className} fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth={1.35} aria-hidden>
+      <circle cx="3.25" cy="4.5" r="1.35" />
+      <path strokeLinecap="round" d="M6.5 4.5h7.25" />
+      <circle cx="3.25" cy="11.5" r="1.35" />
+      <path strokeLinecap="round" d="M6.5 11.5h7.25" />
     </svg>
   );
 }

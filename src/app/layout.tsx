@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { AppProviders } from "@/components/app-providers";
 import { PumpAppFrame } from "@/components/pump-app-frame";
 
 const geistSans = Geist({
@@ -28,7 +29,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="h-full overflow-hidden bg-[var(--pump-bg)] text-[var(--pump-text)]">
-        <PumpAppFrame>{children}</PumpAppFrame>
+        <AppProviders>
+          <PumpAppFrame>{children}</PumpAppFrame>
+        </AppProviders>
       </body>
     </html>
   );

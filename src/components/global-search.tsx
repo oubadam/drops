@@ -105,13 +105,9 @@ export function GlobalSearch({ layout }: { layout: GlobalSearchLayout }) {
     <>
       {filtered.length > 0 ? (
         filtered.map((c) => <SearchRow key={c.mint} coin={c} onPick={() => setOpen(false)} />)
-      ) : (
-        <p className="px-4 py-6 text-center text-sm text-[var(--pump-muted)]">
-          {q.trim()
-            ? "No drops coins match that search."
-            : "No drops coins yet (create one; mint ends in drop)."}
-        </p>
-      )}
+      ) : q.trim() ? (
+        <p className="px-4 py-6 text-center text-sm text-[var(--pump-muted)]">No drops coins match that search.</p>
+      ) : null}
     </>
   );
 

@@ -5,11 +5,16 @@
   "scripts": {
     "dev": "next dev --webpack",
     "dev:turbo": "next dev --turbopack",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "@privy-io/react-auth": "^3.22.1",
+    "@solana-program/memo": "^0.8.0",
+    "@solana-program/system": "^0.8.0",
+    "@solana-program/token": "^0.6.0",
+    "@solana/kit": "^5.5.1",
     "@solana/web3.js": "^1.98.4",
     "@supabase/supabase-js": "^2.103.3",
     "bs58": "^6.0.0",
