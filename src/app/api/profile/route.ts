@@ -13,9 +13,15 @@ function defaultUsername(wallet: string) {
 
 const USERNAME_RULES_ERROR =
   "Username must start and end with a letter or number, can contain periods, underscores and hyphens (but not consecutively), and no special characters at the beginning or end";
+const USERNAME_COOLDOWN_ERROR = "Username can only be changed once every 24 hours.";
+const USERNAME_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 function isValidUsername(username: string): boolean {
   return /^(?=.{1,15}$)(?!.*[._-]{2})[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(username);
+}
+
+function normalizeUsername(username: string): string {
+  return username.trim().replace(/^@+/, "");
 }
 
 export async function GET(request: Request) {
@@ -49,11 +55,22 @@ export async function PUT(request: Request) {
   if (!walletAddress || !isWalletAddress(walletAddress)) {
     return NextResponse.json({ error: "invalid_wallet" }, { status: 400 });
   }
-  const username = (body.username ?? "").trim().slice(0, 15);
+  const username = normalizeUsername((body.username ?? "").slice(0, 15));
   const bio = (body.bio ?? "").trim().slice(0, 280);
   const avatarUrl = (body.avatarUrl ?? "").trim();
   if (!username || !isValidUsername(username)) {
     return NextResponse.json({ error: "invalid_username", message: USERNAME_RULES_ERROR }, { status: 400 });
+  }
+  const existing = await getDropProfileByWallet(walletAddress);
+  if (existing) {
+    const oldUsername = normalizeUsername(existing.username);
+    const usernameChanged = oldUsername !== username;
+    if (usernameChanged) {
+      const lastUpdatedAt = new Date(existing.updatedAt).getTime();
+      if (Number.isFinite(lastUpdatedAt) && Date.now() - lastUpdatedAt < USERNAME_COOLDOWN_MS) {
+        return NextResponse.json({ error: "username_cooldown", message: USERNAME_COOLDOWN_ERROR }, { status: 429 });
+      }
+    }
   }
   const saved = await upsertDropProfile({
     walletAddress,

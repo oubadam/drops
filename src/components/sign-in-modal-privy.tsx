@@ -183,7 +183,7 @@ export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-label="Sign in"
-        className="relative flex w-full max-w-[23rem] flex-col overflow-hidden rounded-2xl border border-white/70 bg-[#101318] font-sans shadow-2xl shadow-black/70"
+        className="relative flex w-full max-w-[23rem] flex-col overflow-hidden rounded-2xl border border-white/70 bg-[#1a212d] font-sans shadow-2xl shadow-black/60"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative px-4 pb-2.5 pt-3.5">
@@ -393,7 +393,7 @@ function IconWallet({ className }: { className?: string }) {
 
 function WalletConnectingCard({ phase, walletLabel }: { phase: "connecting" | "confirming"; walletLabel: string }) {
   return (
-    <div className="rounded-2xl bg-[#0f131a] p-5 text-center">
+    <div className="rounded-2xl bg-[#202938] p-5 text-center">
       <h3 className="mb-2 text-lg font-semibold text-white">Sign message</h3>
       <div className="mt-1 flex justify-center">
         <Image
@@ -514,10 +514,10 @@ function ProfileErrorToast({ entered, message }: { entered: boolean; message: st
       role="alert"
       aria-live="assertive"
     >
-      <p className="text-lg font-semibold text-zinc-100">Error updating profile</p>
+      <p className="text-sm font-semibold text-zinc-100">Error updating profile</p>
       <div className="mt-2 flex items-start gap-2 text-zinc-100">
         <span className="mt-0.5 inline-grid h-4 w-4 place-items-center rounded-full bg-zinc-200 text-[11px] font-bold leading-none text-black">!</span>
-        <p className="text-[1.02rem] leading-snug">{message}</p>
+        <p className="text-[0.82rem] leading-snug">{message}</p>
       </div>
     </div>
   );
@@ -540,7 +540,7 @@ function EditProfileModal(props: {
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-[420px] rounded-2xl border border-white/15 bg-[#0f131a] p-6"
+        className="relative w-full max-w-[420px] rounded-2xl border border-white/15 bg-[#151c28] p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <button
