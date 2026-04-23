@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDropProfileByWallet, upsertDropProfile } from "@/lib/drop-profiles-db";
+import { getDropProfileByUsername, getDropProfileByWallet, upsertDropProfile } from "@/lib/drop-profiles-db";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +14,9 @@ function defaultUsername(wallet: string) {
 const USERNAME_RULES_ERROR =
   "Username must start and end with a letter or number, can contain periods, underscores and hyphens (but not consecutively), and no special characters at the beginning or end";
 const USERNAME_COOLDOWN_ERROR = "Username can only be changed once every 24 hours.";
+const USERNAME_TAKEN_ERROR = "That username is already taken.";
+const PROFILES_TABLE_MISSING_ERROR =
+  "Profiles table is missing in Supabase. Run migration: web/supabase/migrations/20260420000000_drop_profiles.sql";
 const USERNAME_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 function isValidUsername(username: string): boolean {
@@ -72,6 +75,10 @@ export async function PUT(request: Request) {
       }
     }
   }
+  const usernameOwner = await getDropProfileByUsername(username);
+  if (usernameOwner && usernameOwner.walletAddress !== walletAddress) {
+    return NextResponse.json({ error: "username_taken", message: USERNAME_TAKEN_ERROR }, { status: 409 });
+  }
   const saved = await upsertDropProfile({
     walletAddress,
     username,
@@ -79,6 +86,9 @@ export async function PUT(request: Request) {
     avatarUrl,
   });
   if (!saved.ok) {
+    if (saved.error.includes("drop_profiles") || saved.error.toLowerCase().includes("schema cache")) {
+      return NextResponse.json({ error: "profiles_table_missing", message: PROFILES_TABLE_MISSING_ERROR }, { status: 500 });
+    }
     return NextResponse.json({ error: saved.error }, { status: 500 });
   }
   return NextResponse.json({ profile: saved.profile });

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import type { StaticImageData } from "next/image";
 import { useLogin } from "@privy-io/react-auth";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import normaldrop from "@/components/normaldrop.png";
 import defaultPfp from "@/components/dropspfps.png";
 import {
@@ -12,7 +12,7 @@ import {
   signUtf8MessageBase64,
   type InjectedWalletId,
 } from "@/lib/solana-injected-wallet";
-import { clearExternalWalletAddress, setExternalWalletAddress } from "@/lib/external-wallet-session";
+import { clearExternalWalletAddress, getExternalWalletAddress, setExternalWalletAddress } from "@/lib/external-wallet-session";
 import {
   defaultUsernameFromWallet,
   fetchProfile,
@@ -24,7 +24,9 @@ import {
 
 export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const [walletLoginHint, setWalletLoginHint] = useState<string | null>(null);
+  const [walletHintVisible, setWalletHintVisible] = useState(false);
+  const [walletHintEntered, setWalletHintEntered] = useState(false);
+  const [walletHintMessage, setWalletHintMessage] = useState("");
   const [connectingPhase, setConnectingPhase] = useState<"connecting" | "confirming" | null>(null);
   const [connectingWalletLabel, setConnectingWalletLabel] = useState<string | null>(null);
   const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
@@ -44,15 +46,46 @@ export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
     onComplete: () => onClose(),
   });
 
+  useEffect(() => {
+    const wallet = getExternalWalletAddress();
+    if (!wallet) return;
+    void Promise.all([fetchProfile(wallet), fetchWalletBalance(wallet).catch(() => null)]).then(([p, b]) => {
+      setConnectedWallet(wallet);
+      setProfile(p);
+      setBalance(b);
+      const openEdit = typeof window !== "undefined" ? window.localStorage.getItem("drop_open_profile_edit_v1") === "1" : false;
+      if (openEdit) {
+        setEditName(p.username.replace(/^@+/, ""));
+        setEditBio(p.bio);
+        setEditAvatarDataUrl(p.avatarUrl);
+        setEditOpen(true);
+        window.localStorage.removeItem("drop_open_profile_edit_v1");
+      }
+    });
+  }, []);
+
+  function showWalletHint(message: string) {
+    setWalletHintMessage(message);
+    setWalletHintVisible(true);
+    setWalletHintEntered(false);
+    window.setTimeout(() => setWalletHintEntered(true), 10);
+    window.setTimeout(() => setWalletHintEntered(false), 2200);
+    window.setTimeout(() => {
+      setWalletHintVisible(false);
+      setWalletHintEntered(false);
+    }, 3000);
+  }
+
   const connectViaInjectedExtension = useCallback(
     async (wallet: InjectedWalletId, label: string) => {
-      setWalletLoginHint(null);
+      setWalletHintVisible(false);
+      setWalletHintEntered(false);
       setConnectingWalletLabel(label);
       setConnectingPhase("connecting");
       try {
         const provider = getInjectedSolanaProvider(wallet);
         if (!provider) {
-          setWalletLoginHint("Wallet extension not detected. Install or unlock it, then retry.");
+          showWalletHint("Wallet extension not detected. Install or unlock it, then retry.");
           setConnectingPhase(null);
           return;
         }
@@ -69,7 +102,7 @@ export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
         setBalance(nextBalance);
       } catch (e) {
         console.error("[sign-in] extension wallet connect failed", e);
-        setWalletLoginHint("Wallet connection failed. Please approve the extension prompt and retry.");
+        showWalletHint("Wallet connection failed. Please approve the extension prompt and retry.");
       } finally {
         setConnectingPhase(null);
         setConnectingWalletLabel(null);
@@ -194,7 +227,8 @@ export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
               onClick={() => {
                 setConnectingPhase(null);
                 setConnectingWalletLabel(null);
-                setWalletLoginHint(null);
+                setWalletHintVisible(false);
+                setWalletHintEntered(false);
               }}
               className="absolute left-2.5 top-2.5 grid h-6 w-6 cursor-pointer place-items-center rounded-full border border-white/15 bg-white/5 text-xs text-zinc-400 transition hover:bg-white/10 hover:text-white active:scale-95"
             >
@@ -266,39 +300,36 @@ export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
             <span className="shrink-0 text-[1.125rem] leading-none text-zinc-300">›</span>
           </button>
 
-          <div className="relative py-0.5">
-            <div className="absolute inset-0 flex items-center" aria-hidden>
-              <div className="w-full border-t border-white/20" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-[#101318] px-2 text-[0.875rem] leading-none text-zinc-500">or</span>
-            </div>
+          <div className="flex items-center gap-3 py-0.5" aria-hidden>
+            <div className="h-px flex-1 bg-white/20" />
+            <span className="text-[0.875rem] leading-none text-zinc-500">or</span>
+            <div className="h-px flex-1 bg-white/20" />
           </div>
 
           <div className="space-y-2.5">
             <button
               type="button"
               onClick={launchPhantom}
-              className="flex h-11 w-full cursor-pointer items-center gap-2.5 rounded-2xl border border-white/10 bg-[#1a212d] px-3.5 py-2.5 text-left transition hover:border-white/20 hover:bg-[#212b3a]"
+              className="flex h-12 w-full cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-[#1a212d] px-4 py-3 text-left transition hover:border-white/20 hover:bg-[#212b3a]"
             >
               <img
                 src="https://cdn.jsdelivr.net/npm/solana-icons@latest/svg/wallets/phantom.svg"
                 alt=""
-                className="h-5 w-5 shrink-0 rounded-md object-contain"
+                className="h-6 w-6 shrink-0 rounded-md object-contain"
               />
-              <span className="text-[0.8125rem] font-normal leading-none text-white">Phantom</span>
+              <span className="text-[0.9rem] font-medium leading-none text-white">Phantom</span>
             </button>
 
             <button
               type="button"
               onClick={() => setMoreOpen((v) => !v)}
               aria-expanded={moreOpen}
-              className="flex h-11 w-full cursor-pointer items-center gap-2.5 rounded-2xl border border-white/10 bg-[#1a212d] px-3.5 py-2.5 text-left transition hover:border-white/20 hover:bg-[#212b3a]"
+              className="flex h-12 w-full cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-[#1a212d] px-4 py-3 text-left transition hover:border-white/20 hover:bg-[#212b3a]"
             >
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl border border-white/20 text-zinc-300">
-                <IconWallet className="h-4 w-4" />
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-white/20 text-zinc-300">
+                <IconWallet className="h-[18px] w-[18px]" />
               </span>
-              <span className="flex-1 text-[0.8125rem] font-normal leading-none text-white">More wallets</span>
+              <span className="flex-1 text-[0.9rem] font-medium leading-none text-white">More wallets</span>
               <span
                 className={`text-zinc-400 transition-transform duration-200 ${moreOpen ? "rotate-90" : ""}`}
                 aria-hidden
@@ -321,14 +352,6 @@ export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
-            {walletLoginHint ? (
-              <p
-                role="status"
-                className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[0.7rem] leading-snug text-amber-100/95"
-              >
-                {walletLoginHint}
-              </p>
-            ) : null}
           </div>
             </>
           ) : null}
@@ -348,6 +371,7 @@ export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
         />
       ) : null}
       {copiedToastVisible ? <CopiedAddressToast entered={copiedToastEntered} /> : null}
+      {walletHintVisible ? <WalletHintToast entered={walletHintEntered} message={walletHintMessage} /> : null}
       {profileErrorVisible ? <ProfileErrorToast entered={profileErrorEntered} message={profileErrorMessage} /> : null}
     </div>
   );
@@ -358,10 +382,10 @@ function WalletItem({ label, logo, onClick }: { label: string; logo: string; onC
     <button
       type="button"
       onClick={() => void onClick()}
-      className="flex h-11 w-full cursor-pointer items-center gap-2.5 rounded-2xl border border-white/10 bg-[#1a212d] px-3.5 py-2.5 text-left transition hover:border-white/20 hover:bg-[#212b3a]"
+      className="flex h-12 w-full cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-[#1a212d] px-4 py-3 text-left transition hover:border-white/20 hover:bg-[#212b3a]"
     >
-      <img src={logo} alt="" className="h-5 w-5 shrink-0 rounded-md object-contain" />
-      <span className="text-[0.8125rem] font-normal leading-none text-white">{label}</span>
+      <img src={logo} alt="" className="h-6 w-6 shrink-0 rounded-md object-contain" />
+      <span className="text-[0.9rem] font-medium leading-none text-white">{label}</span>
     </button>
   );
 }
@@ -393,7 +417,7 @@ function IconWallet({ className }: { className?: string }) {
 
 function WalletConnectingCard({ phase, walletLabel }: { phase: "connecting" | "confirming"; walletLabel: string }) {
   return (
-    <div className="rounded-2xl bg-[#202938] p-5 text-center">
+    <div className="p-5 text-center">
       <h3 className="mb-2 text-lg font-semibold text-white">Sign message</h3>
       <div className="mt-1 flex justify-center">
         <Image
@@ -410,6 +434,20 @@ function WalletConnectingCard({ phase, walletLabel }: { phase: "connecting" | "c
         <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[#3b82f6] border-t-transparent" />
       </div>
       <p className="mt-2 text-sm text-zinc-400">This proves wallet ownership</p>
+    </div>
+  );
+}
+
+function WalletHintToast({ entered, message }: { entered: boolean; message: string }) {
+  return (
+    <div
+      className={`pointer-events-none fixed left-1/2 top-4 z-[259] w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-amber-400/50 bg-[#2b2118]/95 px-4 py-3 text-center transition-all duration-700 ease-in-out ${
+        entered ? "translate-y-4 opacity-100" : "-translate-y-3 opacity-0"
+      }`}
+      role="status"
+      aria-live="polite"
+    >
+      <p className="text-sm font-semibold text-amber-100">{message}</p>
     </div>
   );
 }
@@ -593,7 +631,7 @@ function EditProfileModal(props: {
             type="button"
             disabled={saving}
             onClick={onSave}
-            className="rounded-2xl bg-[#3b82f6] px-6 py-2.5 text-base font-semibold text-white disabled:opacity-60"
+            className="cursor-pointer rounded-2xl bg-[#3b82f6] px-6 py-2.5 text-base font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? "Saving..." : "Save"}
           </button>

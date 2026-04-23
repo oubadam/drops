@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/fees/distribute",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

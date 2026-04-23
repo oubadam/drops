@@ -38,6 +38,18 @@ export async function getDropProfileByWallet(walletAddress: string): Promise<Dro
   return mapProfile(data as DbProfileRow);
 }
 
+export async function getDropProfileByUsername(username: string): Promise<DropProfile | null> {
+  const admin = getSupabaseAdmin();
+  if (!admin) return null;
+  const { data, error } = await admin
+    .from("drop_profiles")
+    .select("wallet_address,username,bio,avatar_url,updated_at")
+    .ilike("username", username)
+    .maybeSingle();
+  if (error || !data) return null;
+  return mapProfile(data as DbProfileRow);
+}
+
 export async function upsertDropProfile(input: {
   walletAddress: string;
   username: string;

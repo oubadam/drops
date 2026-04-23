@@ -7,13 +7,14 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rawQ = (searchParams.get("q") ?? "").trim();
+  const creator = (searchParams.get("creator") ?? "").trim();
   const q = rawQ.toLowerCase();
 
   if (!isSupabaseLaunchesConfigured()) {
     return NextResponse.json({ configured: false, items: [] satisfies unknown[] });
   }
 
-  let items = await listDropLaunchesFromDb();
+  let items = await listDropLaunchesFromDb(creator || undefined);
   if (rawQ) {
     items = items.filter(
       (r) =>

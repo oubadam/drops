@@ -10,3 +10,15 @@ export function getPinataJwt() {
 export function getSolanaRpcUrl() {
   return process.env.SOLANA_RPC_URL?.trim() || "https://api.mainnet-beta.solana.com";
 }
+
+export function getFeeTreasuryWallet() {
+  return process.env.FEE_TREASURY_WALLET?.trim() || "";
+}
+
+export function getFeesWorkerSecret() {
+  return process.env.FEES_WORKER_SECRET?.trim() || process.env.CRON_SECRET?.trim() || "";
+}
+
+export function getFeeTreasuryPrivateKey() {
+  return process.env.FEE_TREASURY_PRIVATE_KEY?.trim() || "";
+}
