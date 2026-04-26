@@ -7,6 +7,7 @@ import { getExternalWalletAddress, subscribeExternalWallet } from "@/lib/externa
 import { defaultUsernameFromWallet, fetchProfile, fetchWalletBalance, type PersistedProfile } from "@/lib/profile-api";
 import Image from "next/image";
 import defaultPfp from "@/components/dropspfps.png";
+import { useOpenSignIn } from "@/components/sign-in-modal-context";
 
 export default function ProfilePage() {
   const [username, setUsername] = useState("Guest");
@@ -16,6 +17,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<PersistedProfile | null>(null);
   const [balanceUsd, setBalanceUsd] = useState(0);
   const [balanceSol, setBalanceSol] = useState(0);
+  const { openSignIn } = useOpenSignIn();
 
   useEffect(() => {
     const wallet = walletAddress;
@@ -90,6 +92,18 @@ export default function ProfilePage() {
                 View on solscan
               </a>
             </p>
+            {walletAddress ? (
+              <button
+                type="button"
+                onClick={() => {
+                  window.localStorage.setItem("drop_open_profile_edit_v1", "1");
+                  openSignIn();
+                }}
+                className="mt-2 cursor-pointer rounded-lg border border-[var(--pump-border)] bg-[var(--pump-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--pump-text)] transition hover:border-[var(--pump-green)]/50 hover:text-white"
+              >
+                Edit profile
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -129,14 +143,6 @@ export default function ProfilePage() {
         </div>
       ) : null}
 
-      <footer className="border-t border-[var(--pump-border)] pt-8 text-center text-[10px] text-[var(--pump-muted)]">
-        <p>© {new Date().getFullYear()} drop · Not affiliated with pump.fun</p>
-        <p className="mt-2">
-          <Link href="/docs" className="hover:text-[var(--pump-green)]">
-            Docs
-          </Link>
-        </p>
-      </footer>
     </div>
   );
 }

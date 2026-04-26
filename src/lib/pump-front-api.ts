@@ -28,7 +28,7 @@ export const EMPTY_PUMP_FRONT_STATE: PumpFrontCoinState = {
 
 export async function fetchPumpFrontCoinState(mint: string): Promise<PumpFrontCoinState> {
   try {
-    const res = await fetch(`/api/pump-coin/${encodeURIComponent(mint)}`);
+    const res = await fetch(`/api/pump-coin/${encodeURIComponent(mint)}`, { cache: "no-store" });
     if (!res.ok) return { ...EMPTY_PUMP_FRONT_STATE };
     const data = (await res.json()) as Partial<PumpFrontCoinState>;
     return {

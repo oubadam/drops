@@ -16,14 +16,18 @@ import { DROP_COINS_UPDATED_EVENT } from "@/lib/created-coins-storage";
 import type { ExploreEnrichedCoin } from "@/lib/explore-coin-types";
 import { fetchSolanaTokenPairExploreStats } from "@/lib/dexscreener-mcap";
 import { exploreMcapUsd, formatExploreMcap } from "@/lib/explore-mcap";
+import { formatLaunchAgo } from "@/lib/launch-time";
 import { EMPTY_PUMP_FRONT_STATE, fetchPumpFrontCoinState } from "@/lib/pump-front-api";
+import { readExploreExtraMints } from "@/lib/explore-extra-mints";
 import { loadDropLaunchesForUi } from "@/lib/load-drop-launches";
+import { pumpTokenInfoToCreatedRecord, type PumpTokenInfoPayload } from "@/lib/pump-token-info";
 import { loadWatchlistMints, WATCHLIST_UPDATED_EVENT } from "@/lib/watchlist-storage";
 
 const emptyDexFields = {
   mcap: null as number | null,
   vol24h: null as number | null,
   dexId: null as string | null,
+  priceUsd: null as number | null,
   fdvUsd: null as number | null,
   priceChange: { m5: null as number | null, h1: null as number | null, h6: null as number | null, h24: null as number | null },
   txnsH24: null as number | null,
@@ -37,39 +41,112 @@ export function HomeDropsExplore() {
   const [viewMode, setViewMode] = useState<ExploreViewMode>(() => readExploreViewMode());
   const [watchBump, bumpWatch] = useReducer((x: number) => x + 1, 0);
 
+  const LIVE_REFRESH_LIMIT = 18;
+
   useEffect(() => {
     const fn = () => bumpWatch();
     window.addEventListener(WATCHLIST_UPDATED_EVENT, fn);
     return () => window.removeEventListener(WATCHLIST_UPDATED_EVENT, fn);
   }, []);
 
+  const enrichCoins = useCallback(async (coins: ExploreEnrichedCoin[]) => {
+    const targets = coins.slice(0, LIVE_REFRESH_LIMIT);
+    const updates = await Promise.all(
+      targets.map(async (c) => {
+        const [stats, pump] = await Promise.all([
+          fetchSolanaTokenPairExploreStats(c.mint),
+          fetchPumpFrontCoinState(c.mint),
+        ]);
+        return {
+          mint: c.mint,
+          mcap: stats.mcapUsd,
+          vol24h: stats.volumeUsd24h,
+          dexId: stats.dexId,
+          priceUsd: stats.priceUsd,
+          fdvUsd: stats.fdvUsd,
+          priceChange: stats.priceChange,
+          txnsH24: stats.txnsH24,
+          pump,
+        };
+      }),
+    );
+    const byMint = new Map(updates.map((u) => [u.mint, u]));
+    setRows((prev) =>
+      prev.map((r) => {
+        const next = byMint.get(r.mint);
+        return next ? { ...r, ...next } : r;
+      }),
+    );
+  }, []);
+
+  const refreshPumpOnly = useCallback(async (coins: ExploreEnrichedCoin[]) => {
+    const targets = coins.slice(0, LIVE_REFRESH_LIMIT);
+    const updates = await Promise.all(
+      targets.map(async (c) => ({
+        mint: c.mint,
+        pump: await fetchPumpFrontCoinState(c.mint),
+      })),
+    );
+    const byMint = new Map(updates.map((u) => [u.mint, u]));
+    setRows((prev) =>
+      prev.map((r) => {
+        const next = byMint.get(r.mint);
+        return next ? { ...r, pump: next.pump } : r;
+      }),
+    );
+  }, []);
+
   const loadRows = useCallback(async () => {
     const base = await loadDropLaunchesForUi();
-    const next: ExploreEnrichedCoin[] = base.map((c) => ({ ...c, ...emptyDexFields }));
+    const seen = new Set(base.map((c) => c.mint));
+    const extraMints = readExploreExtraMints().filter((m) => !seen.has(m));
+    const extraRecords = await Promise.all(
+      extraMints.map(async (m) => {
+        try {
+          const r = await fetch(`/api/token-info/${encodeURIComponent(m)}`, { cache: "no-store" });
+          if (!r.ok) {
+            return {
+              mint: m,
+              name: m.slice(0, 8),
+              symbol: "TOKEN",
+              description: "",
+              imageUrl: undefined,
+              creatorWallet: undefined,
+              createdAt: new Date().toISOString(),
+            };
+          }
+          const t = (await r.json()) as PumpTokenInfoPayload;
+          if (!t?.mint || t.mint !== m) {
+            return {
+              mint: m,
+              name: m.slice(0, 8),
+              symbol: "TOKEN",
+              description: "",
+              imageUrl: undefined,
+              creatorWallet: undefined,
+              createdAt: new Date().toISOString(),
+            };
+          }
+          return pumpTokenInfoToCreatedRecord(t);
+        } catch {
+          return {
+            mint: m,
+            name: m.slice(0, 8),
+            symbol: "TOKEN",
+            description: "",
+            imageUrl: undefined,
+            creatorWallet: undefined,
+            createdAt: new Date().toISOString(),
+          };
+        }
+      }),
+    );
+    const extras = extraRecords.filter((x): x is NonNullable<typeof x> => x != null);
+    const merged = [...extras, ...base];
+    const next: ExploreEnrichedCoin[] = merged.map((c) => ({ ...c, ...emptyDexFields }));
     setRows(next);
-    for (const c of next) {
-      const [stats, pump] = await Promise.all([
-        fetchSolanaTokenPairExploreStats(c.mint),
-        fetchPumpFrontCoinState(c.mint),
-      ]);
-      setRows((prev) =>
-        prev.map((r) =>
-          r.mint === c.mint
-            ? {
-                ...r,
-                mcap: stats.mcapUsd,
-                vol24h: stats.volumeUsd24h,
-                dexId: stats.dexId,
-                fdvUsd: stats.fdvUsd,
-                priceChange: stats.priceChange,
-                txnsH24: stats.txnsH24,
-                pump,
-              }
-            : r,
-        ),
-      );
-    }
-  }, []);
+    await enrichCoins(next);
+  }, [enrichCoins]);
 
   useEffect(() => {
     const run = () => startTransition(() => void loadRows());
@@ -77,6 +154,22 @@ export function HomeDropsExplore() {
     window.addEventListener(DROP_COINS_UPDATED_EVENT, run);
     return () => window.removeEventListener(DROP_COINS_UPDATED_EVENT, run);
   }, [loadRows]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (rows.length === 0) return;
+      void refreshPumpOnly(rows);
+    }, 2500);
+    return () => window.clearInterval(id);
+  }, [rows, refreshPumpOnly]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (rows.length === 0) return;
+      void enrichCoins(rows);
+    }, 12000);
+    return () => window.clearInterval(id);
+  }, [rows, enrichCoins]);
 
   const trending = useMemo(() => {
     const sorted = [...rows].sort((a, b) => exploreMcapUsd(b) - exploreMcapUsd(a));
@@ -113,7 +206,7 @@ export function HomeDropsExplore() {
       return <ExploreCoinsTable coins={coins} />;
     }
     return (
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3">
         {coins.map((c) => (
           <ExploreGridCard key={c.mint} coin={c} />
         ))}
@@ -221,18 +314,28 @@ function WatchlistEmpty({ onExplore }: { onExplore: () => void }) {
 }
 
 function TrendingCard({ coin }: { coin: ExploreEnrichedCoin }) {
+  const dev = (coin.creatorWallet || coin.mint).slice(0, 6);
+  const desc = (coin.description ?? "").trim() || "No description available.";
   return (
     <Link
-      href={`https://pump.fun/coin/${coin.mint}`}
-      target="_blank"
-      rel="noreferrer"
-      className="flex min-w-[200px] shrink-0 gap-3 rounded-xl border border-[var(--pump-border)] bg-[var(--pump-elevated)] p-3 transition hover:border-[var(--pump-green)]/40"
+      href={`/token/${coin.mint}`}
+      className="flex min-w-[270px] shrink-0 gap-2.5 rounded-xl border border-[var(--pump-border)] bg-[var(--pump-elevated)] p-2.5 transition hover:border-[var(--pump-green)]/40"
     >
-      <ExploreCoinThumb coin={coin} className="h-14 w-14 rounded-lg" />
+      <ExploreCoinThumb coin={coin} className="h-16 w-16 rounded-lg" />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold text-white">{coin.name}</p>
-        <p className="mt-0.5 text-xs font-semibold text-[var(--pump-green)]">{formatExploreMcap(coin)}</p>
-        <p className="mt-1 truncate text-[10px] text-[var(--pump-muted)]">drops · {coin.symbol}</p>
+        <p className="truncate text-lg leading-tight font-bold text-white">{coin.name}</p>
+        <p className="truncate text-base leading-tight text-[var(--pump-muted)]">{coin.symbol}</p>
+        <div className="mt-1 flex items-end gap-1.5">
+          <span className="text-xs leading-none text-[var(--pump-muted)]">MC</span>
+          <span className="text-xl leading-none font-bold text-emerald-400">{formatExploreMcap(coin)}</span>
+        </div>
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-[var(--pump-muted)]">
+          <span className="text-emerald-400">◌</span>
+          <span className="font-semibold text-zinc-200">{dev}</span>
+          <span>·</span>
+          <span>{formatLaunchAgo(coin.createdAt)}</span>
+        </div>
+        <p className="mt-1 line-clamp-1 break-words text-xs leading-snug text-[var(--pump-muted)]">{desc}</p>
       </div>
     </Link>
   );

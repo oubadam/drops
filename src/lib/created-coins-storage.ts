@@ -5,6 +5,7 @@ export type CreatedCoinRecord = {
   mint: string;
   name: string;
   symbol: string;
+  creatorWallet?: string;
   signature?: string;
   createdAt: string;
   description?: string;

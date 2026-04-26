@@ -25,6 +25,7 @@ function mapRow(r: DbRow): CreatedCoinRecord {
     mint: r.mint,
     name: r.name,
     symbol: r.symbol,
+    creatorWallet: r.creator_wallet ?? undefined,
     description: r.description ?? undefined,
     imageUrl: r.image_url ?? undefined,
     signature: r.signature ?? undefined,
@@ -85,11 +86,13 @@ export async function listDropLaunchesFromDb(creatorWallet?: string): Promise<Cr
   const admin = getSupabaseAdmin();
   if (!admin) return [];
 
+  const signal = AbortSignal.timeout(3500);
   let query = admin
     .from("drop_launches")
     .select("mint,name,symbol,creator_wallet,whitelist_wallets,whitelist_fee_bps,holders_fee_bps,holder_limit,fee_treasury_wallet,fee_recipient_locked,description,image_url,metadata_uri,signature,created_at")
     .order("created_at", { ascending: false })
-    .limit(750);
+    .limit(750)
+    .abortSignal(signal);
   if (creatorWallet) query = query.eq("creator_wallet", creatorWallet);
   const { data, error } = await query;
 

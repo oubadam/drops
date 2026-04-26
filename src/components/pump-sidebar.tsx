@@ -130,18 +130,6 @@ export function PumpSidebar() {
         {collapsed ? <IconPlus className="h-[22px] w-[22px] shrink-0 text-black" /> : "Create"}
       </Link>
 
-      {!collapsed && (
-        <div className="mt-3 rounded-xl border border-[var(--pump-border)] bg-[var(--pump-surface)] p-3.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[13px] font-medium text-[var(--pump-muted)]">Creator rewards</span>
-            <span className="rounded bg-[var(--pump-yellow-dim)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--pump-yellow)]">
-              New
-            </span>
-          </div>
-          <p className="mt-2.5 text-xl font-bold tracking-tight text-[var(--pump-text)]">$0.00</p>
-          <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--pump-muted)]">Placeholder until wallet connect.</p>
-        </div>
-      )}
     </aside>
   );
 }

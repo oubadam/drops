@@ -5,7 +5,6 @@ import { useEffect, useMemo, useReducer } from "react";
 
 import { formatLaunchAgo } from "@/lib/launch-time";
 import { mintGradient } from "@/lib/mint-visual";
-import { bondingVisualState } from "@/lib/explore-bonding";
 import type { ExploreEnrichedCoin } from "@/lib/explore-coin-types";
 import { devPreviewFromMint } from "@/lib/drop-coins";
 import { formatMcapUsd, formatVolumeUsd24h } from "@/lib/dexscreener-mcap";
@@ -88,62 +87,57 @@ export function ExploreCoinThumb({ coin, className }: { coin: ExploreEnrichedCoi
 }
 
 export function ExploreGridCard({ coin }: { coin: ExploreEnrichedCoin }) {
+  const [, bump] = useReducer((x: number) => x + 1, 0);
+  useEffect(() => {
+    const fn = () => bump();
+    window.addEventListener(WATCHLIST_UPDATED_EVENT, fn);
+    return () => window.removeEventListener(WATCHLIST_UPDATED_EVENT, fn);
+  }, []);
   const desc = (coin.description ?? "").trim() || "No description available.";
-  const bond = bondingVisualState(coin.pump, coin.mcap, coin.dexId);
-  const mcapColor =
-    bond.mode === "bonding" ? "text-emerald-400" : "text-amber-400 [text-shadow:0_0_1px_rgba(251,191,36,0.35)]";
+  const dev = (coin.creatorWallet || devPreviewFromMint(coin.mint)).slice(0, 6);
+  const starred = isMintWatchlisted(coin.mint);
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border border-[var(--pump-border)] bg-[var(--pump-elevated)]">
-      <div className="relative aspect-square w-full shrink-0 bg-[var(--pump-surface)]">
-        <ExploreCoinThumb coin={coin} className="h-full w-full object-cover" />
-      </div>
-      <div className="flex flex-col p-3">
-        <p className="truncate text-sm font-bold leading-tight text-white">{coin.name}</p>
-        <p className="mt-0.5 truncate text-xs font-semibold uppercase text-[var(--pump-muted)]">{coin.symbol}</p>
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[var(--pump-muted)]">
-          <span className="inline-flex items-center gap-1">
-            <span className="text-emerald-500">●</span>
-            <span className="font-mono text-[var(--pump-text)]">{devPreviewFromMint(coin.mint)}</span>
-          </span>
-          <span>·</span>
-          <span>{formatLaunchAgo(coin.createdAt)}</span>
+    <div className="group relative">
+      <Link href={`/token/${coin.mint}`} className="block">
+        <div className="flex min-h-[126px] items-start gap-3.5 overflow-hidden rounded-xl border border-[var(--pump-border)] bg-[var(--pump-elevated)] p-3.5 pr-12 transition hover:border-[var(--pump-green)]/45">
+        <ExploreCoinThumb coin={coin} className="h-20 w-20 shrink-0 rounded-xl object-cover" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xl font-bold text-white">{coin.name}</p>
+          <p className="truncate text-base text-[var(--pump-muted)]">{coin.symbol}</p>
+          <div className="mt-1.5 flex items-end gap-2">
+            <span className="text-sm text-[var(--pump-muted)]">MC</span>
+            <span className="text-sm font-bold text-emerald-400">{formatExploreMcap(coin)}</span>
+          </div>
+          <div className="mt-1 flex items-center gap-2 text-sm text-[var(--pump-muted)]">
+            <span className="inline-flex items-center gap-1">
+              <span className="text-emerald-400">◌</span>
+              <span className="font-semibold text-zinc-200">{dev}</span>
+            </span>
+            <span>·</span>
+            <span>{formatLaunchAgo(coin.createdAt)}</span>
+          </div>
+          <p className="mt-1.5 line-clamp-2 break-words text-sm leading-snug text-[var(--pump-muted)]">{desc}</p>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--pump-muted)]">MC</span>
-          <span className={`text-sm font-bold ${mcapColor}`}>{formatExploreMcap(coin)}</span>
-          {bond.mode === "bonding" ? (
-            <div className="h-1.5 min-w-[4rem] flex-1 overflow-hidden rounded-full bg-[var(--pump-border)] sm:max-w-[140px]">
-              <div
-                className="h-full rounded-full bg-blue-500"
-                style={{ width: `${Math.round(bond.progress * 100)}%` }}
-              />
-            </div>
-          ) : null}
         </div>
-        <p className="mt-1.5 text-[10px] leading-snug text-[var(--pump-muted)]">
-          {bond.mode === "bonding" ? (
-            <>
-              MCAP from pump.fun · bonding ends when the curve completes, then the coin is on{" "}
-              <span className="text-[var(--pump-text)]">PumpSwap</span>.
-            </>
-          ) : (
-            <span className="text-amber-400/90">On PumpSwap — bonding complete.</span>
-          )}
-        </p>
-        <p className="mt-2 line-clamp-2 text-[11px] leading-snug text-[var(--pump-muted)]">{desc}</p>
-        <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-[var(--pump-muted)]">
-          <span>24h {formatVolumeUsd24h(coin.vol24h)}</span>
-          <a
-            href={`https://pump.fun/coin/${coin.mint}`}
-            target="_blank"
-            rel="noreferrer"
-            className="shrink-0 font-medium text-[var(--pump-green)] hover:underline"
-          >
-            pump.fun
-          </a>
-        </div>
-      </div>
+      </Link>
+      <button
+        type="button"
+        aria-label={starred ? "Remove from watchlist" : "Add to watchlist"}
+        className={`absolute top-2.5 right-2.5 cursor-pointer rounded-md border border-[var(--pump-border)] px-2 py-1 text-base leading-none transition ${
+          starred
+            ? "bg-amber-500/15 text-amber-300"
+            : "bg-[var(--pump-surface)] text-[var(--pump-muted)] opacity-0 group-hover:opacity-100 hover:text-amber-300"
+        }`}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleWatchlistMint(coin.mint);
+          bump();
+        }}
+      >
+        {starred ? "★" : "☆"}
+      </button>
     </div>
   );
 }
@@ -188,9 +182,6 @@ export function ExploreCoinsTable({ coins }: { coins: ExploreEnrichedCoin[] }) {
 }
 
 function ExploreTableRow({ rank, coin, bump }: { rank: number; coin: ExploreEnrichedCoin; bump: () => void }) {
-  const bond = bondingVisualState(coin.pump, coin.mcap, coin.dexId);
-  const mcapCls =
-    bond.mode === "bonding" ? "font-bold text-emerald-400" : "font-bold text-amber-400";
   const ath = athRow(coin);
   const starred = isMintWatchlisted(coin.mint);
 
@@ -200,7 +191,7 @@ function ExploreTableRow({ rank, coin, bump }: { rank: number; coin: ExploreEnri
         #{rank}
       </td>
       <td className="max-w-[200px] px-2 py-2 group-hover:bg-[var(--pump-surface)]/45">
-        <Link href={`https://pump.fun/coin/${coin.mint}`} className="flex min-w-0 items-center gap-2" target="_blank" rel="noreferrer">
+        <Link href={`/token/${coin.mint}`} className="flex min-w-0 items-center gap-2">
           <ExploreCoinThumb coin={coin} className="h-9 w-9 shrink-0 rounded-lg" />
           <div className="min-w-0">
             <p className="truncate font-bold text-white">{coin.name}</p>
@@ -214,16 +205,11 @@ function ExploreTableRow({ rank, coin, bump }: { rank: number; coin: ExploreEnri
       <td className="px-2 py-2 group-hover:bg-[var(--pump-surface)]/45">
         <div className="flex min-w-[5.5rem] flex-col gap-0.5">
           <div className="flex items-center gap-2">
-            <span className={mcapCls}>{formatExploreMcap(coin)}</span>
-            {bond.mode === "bonding" ? (
-              <div className="h-1 w-14 shrink-0 overflow-hidden rounded-full bg-[var(--pump-border)]">
-                <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.round(bond.progress * 100)}%` }} />
-              </div>
-            ) : null}
+            <span className="font-bold text-emerald-400">{formatExploreMcap(coin)}</span>
+            <div className="h-1 w-14 shrink-0 overflow-hidden rounded-full bg-[var(--pump-border)]">
+              <div className="h-full w-[70%] rounded-full bg-emerald-400" />
+            </div>
           </div>
-          <span className="text-[9px] text-[var(--pump-muted)]">
-            {bond.mode === "bonding" ? "pump MCAP · bar = curve progress" : "PumpSwap"}
-          </span>
         </div>
       </td>
       <td className="px-2 py-2 group-hover:bg-[var(--pump-surface)]/45">

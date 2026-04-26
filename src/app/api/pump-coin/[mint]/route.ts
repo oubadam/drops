@@ -15,9 +15,11 @@ function num(v: unknown): number | null {
 
 async function fetchBondingCurveAccountData(rpcUrl: string, pubkey: string): Promise<Uint8Array | null> {
   try {
+    const signal = AbortSignal.timeout(2200);
     const res = await fetch(rpcUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal,
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
@@ -38,6 +40,7 @@ async function fetchBondingCurveAccountData(rpcUrl: string, pubkey: string): Pro
 
 export async function GET(_request: Request, ctx: { params: Promise<{ mint: string }> }) {
   const { mint } = await ctx.params;
+  const noStoreHeaders = { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" };
   const empty = {
     indexed: false,
     complete: false,
@@ -47,19 +50,22 @@ export async function GET(_request: Request, ctx: { params: Promise<{ mint: stri
     realSolLamports: null as number | null,
   };
   if (!mint || mint.length < 20) {
-    return NextResponse.json(empty, { status: 400 });
+    return NextResponse.json(empty, { status: 400, headers: noStoreHeaders });
   }
 
   try {
+    const signal = AbortSignal.timeout(2500);
     const upstream = await fetch(`${PUMP_FRONT}/coins/${encodeURIComponent(mint)}`, {
       headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal,
     });
 
     if (upstream.status === 404) {
-      return NextResponse.json(empty);
+      return NextResponse.json(empty, { headers: noStoreHeaders });
     }
     if (!upstream.ok) {
-      return NextResponse.json(empty);
+      return NextResponse.json(empty, { headers: noStoreHeaders });
     }
 
     const data = (await upstream.json()) as Record<string, unknown>;
@@ -89,15 +95,18 @@ export async function GET(_request: Request, ctx: { params: Promise<{ mint: stri
 
     const complete = completeApi || completeChain;
 
-    return NextResponse.json({
-      indexed: true,
-      complete,
-      usdMarketCap: usd != null && usd >= 0 ? usd : null,
-      athMarketCap: ath != null && ath > 0 ? ath : null,
-      bondingProgress,
-      realSolLamports,
-    });
+    return NextResponse.json(
+      {
+        indexed: true,
+        complete,
+        usdMarketCap: usd != null && usd >= 0 ? usd : null,
+        athMarketCap: ath != null && ath > 0 ? ath : null,
+        bondingProgress,
+        realSolLamports,
+      },
+      { headers: noStoreHeaders },
+    );
   } catch {
-    return NextResponse.json(empty);
+    return NextResponse.json(empty, { headers: noStoreHeaders });
   }
 }

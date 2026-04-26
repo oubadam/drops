@@ -1,3 +1,5 @@
+import bs58 from "bs58";
+
 export type InjectedWalletId = "phantom" | "solflare" | "bitget" | "torus";
 
 type SolanaInjected = {
@@ -6,6 +8,7 @@ type SolanaInjected = {
   isPhantom?: boolean;
   isTorus?: boolean;
   signMessage?: (message: Uint8Array) => Promise<{ signature: Uint8Array } | { signature: Uint8Array }[] | Uint8Array>;
+  signAndSendTransaction?: (tx: unknown, opts?: unknown) => Promise<{ signature?: Uint8Array | string } | string>;
 };
 
 function toBase58Address(pk: unknown): string {
@@ -60,6 +63,35 @@ export function getInjectedSolanaProvider(id: InjectedWalletId): SolanaInjected 
   return null;
 }
 
+function tryGetProviderAddress(provider: SolanaInjected | null): string | null {
+  if (!provider?.publicKey) return null;
+  try {
+    return toBase58Address(provider.publicKey);
+  } catch {
+    return null;
+  }
+}
+
+export async function findInjectedProviderByAddress(address: string): Promise<SolanaInjected | null> {
+  const ids: InjectedWalletId[] = ["phantom", "solflare", "bitget", "torus"];
+  for (const id of ids) {
+    const provider = getInjectedSolanaProvider(id);
+    if (!provider) continue;
+    const existing = tryGetProviderAddress(provider);
+    if (existing === address) return provider;
+    if (provider.connect) {
+      try {
+        await provider.connect({ onlyIfTrusted: true });
+      } catch {
+        /* provider may reject if not trusted yet */
+      }
+      const next = tryGetProviderAddress(provider);
+      if (next === address) return provider;
+    }
+  }
+  return null;
+}
+
 export async function connectInjectedSolana(provider: SolanaInjected): Promise<string> {
   if (!provider.connect) throw new Error("Wallet does not support connect()");
   const res = await provider.connect();
@@ -82,4 +114,15 @@ export async function signUtf8MessageBase64(provider: SolanaInjected, message: s
   let binary = "";
   for (let i = 0; i < raw.length; i++) binary += String.fromCharCode(raw[i]!);
   return btoa(binary);
+}
+
+export async function signAndSendTransactionBase58(provider: SolanaInjected, tx: unknown): Promise<string> {
+  if (!provider.signAndSendTransaction) throw new Error("Wallet cannot send transactions");
+  const out = await provider.signAndSendTransaction(tx, { preflightCommitment: "confirmed" });
+  if (typeof out === "string") return out;
+  const sig = out?.signature;
+  if (!sig) throw new Error("Wallet returned no transaction signature");
+  if (typeof sig === "string") return sig;
+  if (sig instanceof Uint8Array) return bs58.encode(sig);
+  throw new Error("Unsupported signature format from wallet");
 }

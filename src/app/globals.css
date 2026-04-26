@@ -101,6 +101,7 @@ body {
   width: 100%;
   height: 1.75rem;
   background: transparent;
+  pointer-events: none;
 }
 .explore-filter-range:focus {
   outline: none;
@@ -119,6 +120,7 @@ body {
   border: 2px solid var(--pump-green);
   background: var(--pump-bg);
   box-shadow: none;
+  pointer-events: auto;
 }
 .explore-filter-range::-moz-range-track {
   height: 4px;
@@ -132,6 +134,7 @@ body {
   border: 2px solid var(--pump-green);
   background: var(--pump-bg);
   box-sizing: border-box;
+  pointer-events: auto;
 }
 
 /* Dark scrollbar style (track + muted thumb), matching app theme. */
