@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import bs58 from "bs58";
 import { Keypair, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { NextResponse } from "next/server";
-import { getFeeTreasuryWallet, getPinataJwt } from "@/lib/env";
+import { getFeeTreasuryPrivateKey, getFeeTreasuryWallet, getPinataJwt } from "@/lib/env";
 import { ipfsUri, pinataUploadFile } from "@/lib/pinata";
 
 export const maxDuration = 120;
@@ -38,6 +38,19 @@ function isValidSolanaWallet(value: string): boolean {
   }
 }
 
+function loadTreasuryPubkeyFromPrivateKey(): string | null {
+  const raw = getFeeTreasuryPrivateKey();
+  if (!raw) return null;
+  try {
+    const kp = raw.startsWith("[")
+      ? Keypair.fromSecretKey(Uint8Array.from(JSON.parse(raw) as number[]))
+      : Keypair.fromSecretKey(bs58.decode(raw));
+    return kp.publicKey.toBase58();
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   const pinataJwt = getPinataJwt();
   const feeTreasuryWallet = getFeeTreasuryWallet();
@@ -50,6 +63,22 @@ export async function POST(request: Request) {
   if (!feeTreasuryWallet || !isValidSolanaWallet(feeTreasuryWallet)) {
     return NextResponse.json(
       { error: "Missing/invalid FEE_TREASURY_WALLET on server. Launch is blocked until configured." },
+      { status: 500 },
+    );
+  }
+  const treasuryPubkey = loadTreasuryPubkeyFromPrivateKey();
+  if (!treasuryPubkey) {
+    return NextResponse.json(
+      { error: "Missing/invalid FEE_TREASURY_PRIVATE_KEY on server. Launch is blocked until configured." },
+      { status: 500 },
+    );
+  }
+  if (treasuryPubkey !== feeTreasuryWallet) {
+    return NextResponse.json(
+      {
+        error:
+          "FEE_TREASURY_WALLET does not match FEE_TREASURY_PRIVATE_KEY public key. Launch is blocked to prevent broken fee redirection.",
+      },
       { status: 500 },
     );
   }

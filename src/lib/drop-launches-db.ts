@@ -158,20 +158,35 @@ export async function recordFeeDistributionRun(input: {
   claimOk: boolean;
   claimError: string | null;
   claimedLamports: number;
+  buybackLamports: number;
+  tokenAirdropRaw: string | number | bigint;
   whitelistLamportsSent: number;
   holdersLamportsSent: number;
   totalSentLamports: number;
   whitelistTransfersSent: number;
   holderTransfersSent: number;
+  tokenAirdropTransfersSent: number;
 }): Promise<void> {
   const admin = getSupabaseAdmin();
   if (!admin) return;
+  const tokenAirdropRawBigint = (() => {
+    try {
+      if (typeof input.tokenAirdropRaw === "bigint") return input.tokenAirdropRaw;
+      if (typeof input.tokenAirdropRaw === "number") return BigInt(Math.max(0, Math.floor(input.tokenAirdropRaw)));
+      return BigInt(String(input.tokenAirdropRaw ?? "0"));
+    } catch {
+      return BigInt(0);
+    }
+  })();
   await admin.from("drop_fee_distribution_runs").insert({
     mint: input.mint,
     claim_signature: input.claimSignature,
     claim_ok: input.claimOk,
     claim_error: input.claimError,
     claimed_lamports: Math.max(0, Math.floor(input.claimedLamports || 0)),
+    buyback_lamports: Math.max(0, Math.floor(input.buybackLamports || 0)),
+    token_airdrop_raw: tokenAirdropRawBigint.toString(),
+    token_airdrop_transfers_sent: Math.max(0, Math.floor(input.tokenAirdropTransfersSent || 0)),
     whitelist_lamports_sent: Math.max(0, Math.floor(input.whitelistLamportsSent || 0)),
     holders_lamports_sent: Math.max(0, Math.floor(input.holdersLamportsSent || 0)),
     total_sent_lamports: Math.max(0, Math.floor(input.totalSentLamports || 0)),

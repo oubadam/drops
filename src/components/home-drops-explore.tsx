@@ -308,8 +308,8 @@ export function HomeDropsExplore() {
     <section className="w-full text-left">
       {copyToastVisible ? (
         <div
-          className={`pointer-events-none fixed left-1/2 top-4 z-[260] -translate-x-1/2 rounded-xl border border-[#3b82f6] bg-[#0b1018]/95 px-4 py-3 text-sm font-semibold text-white transition-all duration-700 ease-in-out ${
-            copyToastEntered ? "translate-y-4 opacity-100" : "-translate-y-3 opacity-0"
+          className={`pointer-events-none fixed left-1/2 top-2 z-[260] -translate-x-1/2 rounded-xl border border-[#3b82f6] bg-[#0b1018]/95 px-4 py-3 text-sm font-semibold text-white transition-all duration-700 ease-in-out ${
+            copyToastEntered ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0"
           }`}
         >
           {copyToastText}

@@ -363,11 +363,14 @@ async function handleDistribution(request: Request) {
       claimOk: claim.ok,
       claimError: claim.ok ? null : claim.error ?? "claim_failed",
       claimedLamports,
+      buybackLamports,
+      tokenAirdropRaw: tokenAirdropRaw.toString(),
       whitelistLamportsSent: whitelistSend.lamportsSent,
       holdersLamportsSent: holderSend.lamportsSent,
       totalSentLamports,
       whitelistTransfersSent: whitelistSend.sent,
       holderTransfersSent: holderSend.sent,
+      tokenAirdropTransfersSent,
     });
 
     results.push({

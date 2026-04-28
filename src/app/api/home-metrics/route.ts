@@ -4,26 +4,50 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 
-const PUMP_TOTAL_SUPPLY_MILLIONS = 1000; // 1B supply per launch => 1000M
-
 export async function GET() {
   const launches = await listFeeConfiguredLaunches();
   const tokensLaunched = launches.length;
-  const tokenPayoutsMillions = tokensLaunched * PUMP_TOTAL_SUPPLY_MILLIONS;
+  let tokenPayoutsMillions = 0;
   let solAirdroppedSol = 0;
 
   const admin = getSupabaseAdmin();
   if (admin) {
     const { data, error } = await admin
       .from("drop_fee_distribution_runs")
-      .select("total_sent_lamports")
+      .select("total_sent_lamports,token_airdrop_raw")
       .limit(10000);
     if (!error && Array.isArray(data)) {
-      const lamports = data.reduce((acc, row) => {
-        const n = Number((row as { total_sent_lamports?: unknown }).total_sent_lamports ?? 0);
-        return Number.isFinite(n) && n > 0 ? acc + n : acc;
-      }, 0);
-      solAirdroppedSol = lamports / 1_000_000_000;
+      const sums = data.reduce(
+        (acc, row) => {
+          const n = Number((row as { total_sent_lamports?: unknown }).total_sent_lamports ?? 0);
+          if (Number.isFinite(n) && n > 0) acc.lamports += n;
+          try {
+            const raw = BigInt(String((row as { token_airdrop_raw?: unknown }).token_airdrop_raw ?? "0"));
+            if (raw > BigInt(0)) acc.tokenRaw += raw;
+          } catch {
+            // ignore bad data rows
+          }
+          return acc;
+        },
+        { lamports: 0, tokenRaw: BigInt(0) },
+      );
+      solAirdroppedSol = sums.lamports / 1_000_000_000;
+      // Pump tokens are 6 decimals; millions of tokens = raw / 1e12.
+      tokenPayoutsMillions = Number(sums.tokenRaw) / 1_000_000_000_000;
+    } else {
+      // Backward-compatible fallback: table exists but token_airdrop_raw column may not yet be migrated.
+      const { data: legacyRows, error: legacyError } = await admin
+        .from("drop_fee_distribution_runs")
+        .select("total_sent_lamports")
+        .limit(10000);
+      if (!legacyError && Array.isArray(legacyRows)) {
+        const lamports = legacyRows.reduce((acc, row) => {
+          const n = Number((row as { total_sent_lamports?: unknown }).total_sent_lamports ?? 0);
+          return Number.isFinite(n) && n > 0 ? acc + n : acc;
+        }, 0);
+        solAirdroppedSol = lamports / 1_000_000_000;
+      }
+      tokenPayoutsMillions = 0;
     }
   }
 
@@ -34,7 +58,7 @@ export async function GET() {
       solAirdroppedSol,
       source: "launchpad_exact_db",
       notes: {
-        tokenPayouts: "Derived from launched Pump tokens (1B each => 1000M each).",
+        tokenPayouts: "Exact executed token airdrops from worker runs (0 until buyback/airdrop actually executes).",
         solAirdropped: "Exact sum of sent lamports recorded during launchpad payout runs.",
       },
     },
