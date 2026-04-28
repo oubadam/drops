@@ -174,6 +174,16 @@ export default function CreateTokenPage() {
         setError(finalized.error ?? "Launch finalize failed.");
         return;
       }
+      if (finalized.launchIndexed === false) {
+        const reason =
+          typeof finalized.launchIndexError === "string" && finalized.launchIndexError.trim().length > 0
+            ? finalized.launchIndexError
+            : "unknown_error";
+        setError(
+          `Coin launched, but launch settings were not saved (${reason}). Fix server DB config and relaunch to enable fee auto-redirect + airdrop rules.`,
+        );
+        return;
+      }
 
       const launchedMint = typeof finalized.mint === "string" ? finalized.mint : "";
       prependCreatedCoin({

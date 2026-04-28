@@ -151,7 +151,7 @@ async function sendLamportTransfers(
   return { sent, signatures, lamportsSent };
 }
 
-export async function POST(request: Request) {
+async function handleDistribution(request: Request) {
   const workerSecret = getFeesWorkerSecret();
   if (!workerSecret) return NextResponse.json({ error: "Missing FEES_WORKER_SECRET." }, { status: 500 });
   const auth = request.headers.get("authorization") ?? "";
@@ -236,4 +236,12 @@ export async function POST(request: Request) {
     results,
     note: "Claims and SOL distributions executed. Holder distribution uses top holder accounts (excluding creator) with sqrt-weighted spread.",
   });
+}
+
+export async function POST(request: Request) {
+  return handleDistribution(request);
+}
+
+export async function GET(request: Request) {
+  return handleDistribution(request);
 }
