@@ -120,6 +120,9 @@ export type FeeConfiguredLaunch = {
   holdersFeeBps: number;
   holderLimit: number;
   feeTreasuryWallet: string;
+  devBuyAirdropEnabled: boolean;
+  devBuyAirdropBps: number;
+  devBuyAirdropWalletBps: number[];
 };
 
 export async function listFeeConfiguredLaunches(): Promise<FeeConfiguredLaunch[]> {
@@ -127,7 +130,7 @@ export async function listFeeConfiguredLaunches(): Promise<FeeConfiguredLaunch[]
   if (!admin) return [];
   const { data, error } = await admin
     .from("drop_launches")
-    .select("mint,symbol,creator_wallet,whitelist_wallets,whitelist_fee_bps,holders_fee_bps,holder_limit,fee_treasury_wallet,fee_recipient_locked");
+    .select("mint,symbol,creator_wallet,whitelist_wallets,whitelist_fee_bps,holders_fee_bps,holder_limit,fee_treasury_wallet,fee_recipient_locked,dev_buy_airdrop_enabled,dev_buy_airdrop_bps,dev_buy_airdrop_wallet_bps");
   if (error || !Array.isArray(data)) return [];
   return (data as Array<Record<string, unknown>>)
     .filter((r) => Boolean(r.fee_recipient_locked))
@@ -140,6 +143,11 @@ export async function listFeeConfiguredLaunches(): Promise<FeeConfiguredLaunch[]
       holdersFeeBps: Number(r.holders_fee_bps ?? 10000),
       holderLimit: Number(r.holder_limit ?? 100),
       feeTreasuryWallet: String(r.fee_treasury_wallet ?? ""),
+      devBuyAirdropEnabled: Boolean(r.dev_buy_airdrop_enabled),
+      devBuyAirdropBps: Math.max(0, Math.min(10000, Number(r.dev_buy_airdrop_bps ?? 0) || 0)),
+      devBuyAirdropWalletBps: Array.isArray(r.dev_buy_airdrop_wallet_bps)
+        ? (r.dev_buy_airdrop_wallet_bps as number[]).map((v) => Math.max(0, Number(v) || 0))
+        : [],
     }))
     .filter((r) => r.mint.length > 0 && r.feeTreasuryWallet.length > 0);
 }
