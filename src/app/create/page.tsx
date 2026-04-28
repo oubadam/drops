@@ -2,14 +2,22 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { mintGradient, mintSparkPoints, sparkLinePathD } from "@/lib/mint-visual";
 import { prependCreatedCoin } from "@/lib/created-coins-storage";
 import { getExternalWalletAddress } from "@/lib/external-wallet-session";
+import { findInjectedProviderByAddress, signAndSendTransactionBase58 } from "@/lib/solana-injected-wallet";
 
 const NAME_MAX_LEN = 32;
 const TICKER_MAX_LEN = 10;
 const MAX_WHITELIST_WALLETS = 25;
+
+function b64ToBytes(b64: string): Uint8Array {
+  const s = atob(b64);
+  const out = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+  return out;
+}
 
 export default function CreateTokenPage() {
   const router = useRouter();
@@ -19,13 +27,15 @@ export default function CreateTokenPage() {
   const [website, setWebsite] = useState("");
   const [twitter, setTwitter] = useState("");
   const [telegram, setTelegram] = useState("");
-  const [amount, setAmount] = useState("0.05");
+  const [amount, setAmount] = useState("0");
   const [whitelistWalletInputs, setWhitelistWalletInputs] = useState<string[]>([""]);
   const [whitelistFeePercent, setWhitelistFeePercent] = useState(0);
+  const [devBuyAirdropEnabled, setDevBuyAirdropEnabled] = useState(false);
+  const [devBuyAirdropTokenPercent, setDevBuyAirdropTokenPercent] = useState(0);
+  const [devBuyAirdropWalletPercents, setDevBuyAirdropWalletPercents] = useState<Record<string, number>>({});
   const [image, setImage] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showBuyModal, setShowBuyModal] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
   const previewSeed = `${name}|${symbol}`.trim() || "preview";
@@ -48,67 +58,157 @@ export default function CreateTokenPage() {
     const symbolLen = symbol.trim().length;
     const wallets = whitelistWalletInputs.map((w) => w.trim()).filter((w) => w.length > 0);
     const allValid = wallets.every(isValidSolanaPublicKey);
+    const whitelistRuleOk = whitelistFeePercent <= 0 ? true : wallets.length >= 1;
+    const devBuyAirdropRuleOk = devBuyAirdropEnabled ? wallets.length >= 1 : true;
     return (
       nameLen > 0 &&
       nameLen <= NAME_MAX_LEN &&
       symbolLen > 0 &&
       symbolLen <= TICKER_MAX_LEN &&
       allValid &&
-      wallets.length >= 1 &&
+      whitelistRuleOk &&
+      devBuyAirdropRuleOk &&
       wallets.length <= MAX_WHITELIST_WALLETS &&
       image !== null &&
       !loading
     );
-  }, [name, symbol, whitelistWalletInputs, image, loading]);
+  }, [name, symbol, whitelistWalletInputs, whitelistFeePercent, devBuyAirdropEnabled, image, loading]);
 
-  async function createCoinWithAmount() {
-    if (!image) return;
-    setLoading(true);
-    setError(null);
-    const fd = new FormData();
-    fd.append("name", name.trim());
-    fd.append("symbol", symbol.trim().toUpperCase());
-    fd.append("description", description.trim());
-    fd.append("website", website.trim());
-    fd.append("twitter", twitter.trim());
-    fd.append("telegram", telegram.trim());
-    fd.append("amount", String(Math.max(0.05, Number(amount) || 0.05)));
-    const cleanWallets = Array.from(
+  const cleanWalletsForAirdrops = useMemo(() => {
+    return Array.from(
       new Set(
         whitelistWalletInputs
           .map((w) => w.trim())
           .filter((w) => w.length > 0 && isValidSolanaPublicKey(w)),
       ),
     );
-    fd.append("whitelistWallets", JSON.stringify(cleanWallets));
-    fd.append("whitelistFeeBps", String(Math.round(whitelistFeePercent * 100)));
-    fd.append("image", image);
-    const creatorWallet = getExternalWalletAddress();
-    if (creatorWallet) fd.append("creatorWallet", creatorWallet);
+  }, [whitelistWalletInputs]);
 
-    const res = await fetch("/api/create-token", { method: "POST", body: fd });
-    const data = await res.json().catch(() => ({}));
-    setLoading(false);
-    if (!res.ok) {
-      setError(data.error ?? "Create failed.");
-      return;
-    }
-    prependCreatedCoin({
-      mint: data.mint,
-      name: name.trim(),
-      symbol: symbol.trim().toUpperCase(),
-      signature: data.signature ?? undefined,
-      createdAt: new Date().toISOString(),
-      description: description.trim() || undefined,
-      imageUrl: typeof data.imageUrl === "string" ? data.imageUrl : undefined,
+  useEffect(() => {
+    if (!devBuyAirdropEnabled) return;
+    if (cleanWalletsForAirdrops.length < 1) return;
+    setDevBuyAirdropWalletPercents((prev) => {
+      const next: Record<string, number> = { ...prev };
+      const known = cleanWalletsForAirdrops.filter((w) => Number.isFinite(next[w]));
+      if (known.length >= cleanWalletsForAirdrops.length) return prev;
+      const equal = 100 / cleanWalletsForAirdrops.length;
+      for (const w of cleanWalletsForAirdrops) {
+        if (!Number.isFinite(next[w])) next[w] = equal;
+      }
+      return next;
     });
-    router.push("/profile");
+  }, [devBuyAirdropEnabled, cleanWalletsForAirdrops]);
+
+  async function createCoinWithAmount() {
+    if (!image) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("name", name.trim());
+      fd.append("symbol", symbol.trim().toUpperCase());
+      fd.append("description", description.trim());
+      fd.append("website", website.trim());
+      fd.append("twitter", twitter.trim());
+      fd.append("telegram", telegram.trim());
+      fd.append("amount", String(Math.max(0, Number(amount) || 0)));
+      const cleanWallets = cleanWalletsForAirdrops;
+      fd.append("whitelistWallets", JSON.stringify(cleanWallets));
+      fd.append("whitelistFeeBps", String(Math.round(whitelistFeePercent * 100)));
+      fd.append("devBuyAirdropEnabled", devBuyAirdropEnabled ? "1" : "0");
+      fd.append("devBuyAirdropBps", String(Math.round(devBuyAirdropTokenPercent * 100)));
+      if (devBuyAirdropEnabled && cleanWallets.length > 0) {
+        const rawPercents = cleanWallets.map((w) => Math.max(0, Number(devBuyAirdropWalletPercents[w] ?? 0) || 0));
+        const sum = rawPercents.reduce((a, b) => a + b, 0);
+        const normalized = sum > 0 ? rawPercents.map((p) => (p / sum) * 100) : rawPercents.map(() => 100 / cleanWallets.length);
+        const bps = normalized.map((p) => Math.round(p * 100));
+        const bpsSum = bps.reduce((a, b) => a + b, 0);
+        if (bpsSum !== 10000 && bps.length > 0) bps[bps.length - 1] += 10000 - bpsSum;
+        fd.append("devBuyAirdropWalletBps", JSON.stringify(bps));
+      } else {
+        fd.append("devBuyAirdropWalletBps", "[]");
+      }
+      fd.append("image", image);
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 120_000);
+      const creatorWallet = getExternalWalletAddress();
+      if (!creatorWallet) {
+        setError("Connect your wallet first.");
+        return;
+      }
+      fd.append("creatorWallet", creatorWallet);
+
+      const res = await fetch("/api/create-token", {
+        method: "POST",
+        body: fd,
+        signal: controller.signal,
+      }).finally(() => window.clearTimeout(timeout));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Create failed.");
+        return;
+      }
+      if (typeof data.transactionBase64 !== "string" || !data.draft) {
+        setError("Launch payload missing wallet transaction.");
+        return;
+      }
+
+      const provider = await findInjectedProviderByAddress(creatorWallet);
+      if (!provider) {
+        setError("Wallet provider not available. Reconnect wallet and retry.");
+        return;
+      }
+      const tx = VersionedTransaction.deserialize(b64ToBytes(data.transactionBase64));
+      const walletSig = await signAndSendTransactionBase58(provider, tx);
+
+      const finalizeRes = await fetch("/api/create-token/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          signature: walletSig,
+          draft: data.draft,
+        }),
+      });
+      const finalized = await finalizeRes.json().catch(() => ({}));
+      if (!finalizeRes.ok) {
+        setError(finalized.error ?? "Launch finalize failed.");
+        return;
+      }
+
+      const launchedMint = typeof finalized.mint === "string" ? finalized.mint : "";
+      prependCreatedCoin({
+        mint: launchedMint,
+        name: name.trim(),
+        symbol: symbol.trim().toUpperCase(),
+        signature: finalized.signature ?? undefined,
+        createdAt: new Date().toISOString(),
+        description: description.trim() || undefined,
+        imageUrl: typeof finalized.imageUrl === "string" ? finalized.imageUrl : undefined,
+      });
+      router.push(launchedMint ? `/token/${launchedMint}` : "/profile");
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") {
+        setError("Launch request exceeded 120s. Please retry.");
+        return;
+      }
+      setError(e instanceof Error ? e.message : "Create failed.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
-    setShowBuyModal(true);
+    if ((whitelistFeePercent > 0 || devBuyAirdropEnabled) && whitelistWalletInputs.every((w) => w.trim().length === 0)) {
+      setError("Add at least one whitelist wallet when whitelist split is used or dev-buy token airdrop is enabled.");
+      return;
+    }
+    if (Number(amount) < 0) {
+      setError("Dev buy cannot be negative.");
+      return;
+    }
+    void createCoinWithAmount();
   }
 
   function handleDropFile(e: React.DragEvent<HTMLDivElement>) {
@@ -155,8 +255,7 @@ export default function CreateTokenPage() {
               />
             </Field>
           </div>
-          <p className="text-xs text-[var(--pump-muted)]">Name max {NAME_MAX_LEN} chars · Ticker max {TICKER_MAX_LEN} chars</p>
-          <Field label="Airdrop wallets (1 to 25, one per line or comma-separated)">
+          <Field label="Airdrop wallets (1 to 25, one per line or comma-separated) (Whitelisted wallets)">
             <div className="space-y-2">
               {whitelistWalletInputs.map((wallet, idx) => {
                 const hasValue = wallet.trim().length > 0;
@@ -172,9 +271,9 @@ export default function CreateTokenPage() {
                           return next;
                         })
                       }
-                      placeholder={`Wallet ${idx + 1} public key`}
+                      placeholder={`Wallet ${idx + 1} SOL address`}
                       className={`field flex-1 font-mono text-xs ${valid ? "" : "border-red-500/60"}`}
-                      required={idx === 0}
+                      required={idx === 0 && whitelistFeePercent > 0}
                     />
                     {whitelistWalletInputs.length > 1 ? (
                       <button
@@ -217,6 +316,11 @@ export default function CreateTokenPage() {
               </div>
             </div>
           </Field>
+          {whitelistFeePercent > 0 && whitelistWalletInputs.every((w) => w.trim().length === 0) ? (
+            <p className="text-xs text-amber-300">
+              Add at least one whitelist wallet when whitelist fee split is above 0%.
+            </p>
+          ) : null}
           <div className="rounded-xl border border-[var(--pump-border)] bg-[var(--pump-surface)] p-4">
             <div className="flex items-center justify-between text-sm">
               <p className="font-semibold text-[var(--pump-text)]">Creator fee split to whitelist wallets</p>
@@ -232,8 +336,11 @@ export default function CreateTokenPage() {
               className="mt-3 w-full accent-[#3b82f6]"
             />
             <p className="mt-2 text-xs text-[var(--pump-muted)]">
-              Whitelist wallets: {whitelistFeePercent}% (equal split) · Holders (top 100): {100 - whitelistFeePercent}% (weighted by holdings)
+              Whitelist wallets: {whitelistFeePercent}% (equal split) · Holders (top 100): {100 - whitelistFeePercent}%
             </p>
+            {whitelistFeePercent === 0 ? (
+              <p className="mt-1 text-xs text-[var(--pump-muted)]">No whitelist wallets needed at 0% (holders receive 100%).</p>
+            ) : null}
           </div>
           <Field label="Description (optional)">
             <textarea
@@ -259,6 +366,109 @@ export default function CreateTokenPage() {
               </Field>
             </div>
           </details>
+        </section>
+
+        <section className="rounded-2xl border border-[var(--pump-border)] bg-[var(--pump-elevated)] p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-black tracking-tight text-white">Dev buy + optional token airdrop</h2>
+              <p className="mt-1 text-xs text-[var(--pump-muted)]">
+                Dev buy is optional. If you keep token airdrop off, you keep all dev-bought tokens normally. If enabled, token airdrop settings are saved at launch.
+              </p>
+            </div>
+          </div>
+
+          <label className="mt-4 block text-xs font-semibold text-[var(--pump-muted)]">Dev buy amount (SOL)</label>
+          <div className="mt-2 flex items-center rounded-xl border border-[var(--pump-border)] bg-[var(--pump-surface)] px-3 py-2.5">
+            <input
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              type="number"
+              min="0"
+              step="0.000001"
+              className="w-full bg-transparent text-base text-white outline-none placeholder:text-zinc-400"
+            />
+            <span className="ml-2 text-base text-zinc-200">SOL</span>
+          </div>
+          <p className="mt-2 text-xs text-[var(--pump-muted)]">Minimum 0 SOL</p>
+
+          <div className="mt-5 rounded-xl border border-[var(--pump-border)] bg-[var(--pump-surface)] p-4">
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-[var(--pump-text)]">Airdrop tokens from dev buy (optional)</span>
+              <input
+                type="checkbox"
+                checked={devBuyAirdropEnabled}
+                onChange={(e) => setDevBuyAirdropEnabled(e.target.checked)}
+                className="h-4 w-4 accent-[#3b82f6]"
+              />
+            </label>
+            {devBuyAirdropEnabled ? (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <div className="flex items-center justify-between text-xs text-[var(--pump-muted)]">
+                    <span>% of the dev-bought tokens to airdrop</span>
+                    <span className="font-semibold text-[var(--pump-text)]">{devBuyAirdropTokenPercent}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={devBuyAirdropTokenPercent}
+                    onChange={(e) => setDevBuyAirdropTokenPercent(Number(e.target.value))}
+                    className="mt-2 w-full accent-[#3b82f6]"
+                  />
+                </div>
+                <div className="rounded-xl border border-[var(--pump-border)] bg-[var(--pump-elevated)] p-3">
+                  <p className="text-xs font-semibold text-[var(--pump-text)]">Wallet split (who gets what)</p>
+                  <p className="mt-1 text-xs text-[var(--pump-muted)]">
+                    These percentages control how the airdropped tokens are split across your airdrop wallets.
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {cleanWalletsForAirdrops.length > 0 ? (
+                      cleanWalletsForAirdrops.map((w) => {
+                        const pct = devBuyAirdropWalletPercents[w] ?? 0;
+                        return (
+                          <div key={w} className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1 truncate rounded-lg border border-[var(--pump-border)] bg-[var(--pump-surface)] px-2 py-2 font-mono text-[11px] text-[var(--pump-muted)]">
+                              {w}
+                            </div>
+                            <input
+                              value={String(pct)}
+                              onChange={(e) =>
+                                setDevBuyAirdropWalletPercents((prev) => ({
+                                  ...prev,
+                                  [w]: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
+                                }))
+                              }
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.1"
+                              className="w-[92px] rounded-lg border border-[var(--pump-border)] bg-[var(--pump-surface)] px-2 py-2 text-xs text-white outline-none"
+                            />
+                            <span className="text-xs text-[var(--pump-muted)]">%</span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-xs text-amber-300">Add at least one airdrop wallet above to enable token airdrops.</p>
+                    )}
+                  </div>
+                </div>
+
+                <p className="text-xs text-[var(--pump-muted)]">
+                  This does <span className="font-semibold text-[var(--pump-text)]">not</span> mean “% of total supply”. Pump.fun supply is 1B,
+                  but your dev buy only purchases some amount of tokens — this slider controls what % of those dev-bought tokens you airdrop.
+                </p>
+                {whitelistWalletInputs.every((w) => w.trim().length === 0) ? (
+                  <p className="text-xs text-amber-300">Add at least one whitelist wallet to use dev-buy token airdrop.</p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-[var(--pump-muted)]">Off by default.</p>
+            )}
+          </div>
         </section>
 
         <section className="rounded-2xl border border-[var(--pump-border)] bg-[var(--pump-elevated)] p-5 sm:p-6">
@@ -364,58 +574,6 @@ export default function CreateTokenPage() {
           </div>
         </div>
       </aside>
-      {showBuyModal ? (
-        <div className="fixed inset-0 z-[220] grid place-items-center bg-black/70 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-[420px] rounded-xl border border-white/85 bg-[#0f131b] px-6 py-7 text-center">
-            <h3 className="text-xl font-semibold leading-snug text-white">
-              Choose how many {symbol.trim() ? `$${symbol.trim().toLowerCase()}` : "$ticker"} you want to buy (optional)
-            </h3>
-            <p className="mt-3 text-sm leading-relaxed text-zinc-300">
-              Tip: its optional but buying a small amount of coins helps protect your coin from snipers
-            </p>
-            <div className="mt-5 flex items-center rounded-xl border border-white/70 bg-[#2a2f3d] px-3 py-2.5">
-              <input
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                type="number"
-                min="0.05"
-                step="0.01"
-                className="w-full bg-transparent text-lg text-white outline-none placeholder:text-zinc-400"
-              />
-              <span className="ml-2 text-xl text-zinc-100">SOL</span>
-              <span className="ml-2 grid h-7 w-7 place-items-center overflow-hidden rounded-full border border-white/40">
-                <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
-                  <defs>
-                    <linearGradient id="solGradA" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#00ffa3" />
-                      <stop offset="100%" stopColor="#dc1fff" />
-                    </linearGradient>
-                  </defs>
-                  <rect x="4" y="5" width="16" height="3" rx="1.5" fill="url(#solGradA)" />
-                  <rect x="4" y="10.5" width="16" height="3" rx="1.5" fill="url(#solGradA)" />
-                  <rect x="4" y="16" width="16" height="3" rx="1.5" fill="url(#solGradA)" />
-                </svg>
-              </span>
-            </div>
-            <p className="mt-2 text-left text-sm text-zinc-400">Minimum 0.05 SOL</p>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => {
-                if (Number(amount) < 0.05) {
-                  setError("Minimum dev buy is 0.05 SOL.");
-                  return;
-                }
-                setShowBuyModal(false);
-                void createCoinWithAmount();
-              }}
-              className="mt-7 w-full cursor-pointer rounded-2xl bg-[#3b82f6] py-3 text-base font-semibold text-white transition hover:bg-[#2563eb] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading ? "Creating..." : "Create coin"}
-            </button>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -432,7 +590,7 @@ function isValidSolanaPublicKey(value: string): boolean {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block space-y-2">
-      <span className="text-xs font-semibold text-[var(--pump-muted)]">{label}</span>
+      <span className="text-sm font-bold text-[var(--pump-text)]">{label}</span>
       {children}
     </label>
   );

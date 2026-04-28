@@ -29,9 +29,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="h-full overflow-hidden bg-[var(--pump-bg)] text-[var(--pump-text)]">
-        <AppProviders>
-          <PumpAppFrame>{children}</PumpAppFrame>
-        </AppProviders>
+        <div className="h-full">
+          <AppProviders>
+            <PumpAppFrame>{children}</PumpAppFrame>
+          </AppProviders>
+        </div>
       </body>
     </html>
   );

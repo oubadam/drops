@@ -4,11 +4,24 @@ export async function pinataUploadFile(jwt: string, file: File, filename?: strin
   form.append("network", "public");
   form.append("file", file, (filename ?? file.name) || "upload");
 
-  const res = await fetch("https://uploads.pinata.cloud/v3/files", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${jwt}` },
-    body: form,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+  let res: Response;
+  try {
+    res = await fetch("https://uploads.pinata.cloud/v3/files", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${jwt}` },
+      body: form,
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error("Pinata upload timed out after 20s");
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
   if (!res.ok) {

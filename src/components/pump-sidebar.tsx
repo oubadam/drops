@@ -18,6 +18,27 @@ const nav: NavItem[] = [
   { href: "/docs", label: "Docs", icon: IconDoc },
 ];
 
+const sidebarSocials = [
+  {
+    href: "https://x.com/dropsdotfun",
+    label: "X",
+    logoSrc: "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/x.svg",
+    logoClassName: "invert",
+  },
+  {
+    href: "https://pump.fun",
+    label: "Pump.fun",
+    logoSrc: "https://pump.fun/favicon.ico",
+    logoClassName: "",
+  },
+  {
+    href: "https://dexscreener.com",
+    label: "DexScreener",
+    logoSrc: "https://dexscreener.com/favicon.png",
+    logoClassName: "",
+  },
+] as const;
+
 /** Collapse state lives here so the same component that owns width classes always re-renders on toggle. */
 export function PumpSidebar() {
   const pathname = usePathname();
@@ -130,6 +151,34 @@ export function PumpSidebar() {
         {collapsed ? <IconPlus className="h-[22px] w-[22px] shrink-0 text-black" /> : "Create"}
       </Link>
 
+      <div className="mt-auto flex w-full justify-center pt-4">
+        <div className="flex items-center justify-center gap-4">
+          {sidebarSocials.map((s) => {
+            return (
+              <a
+                key={s.label}
+                href={s.href}
+                target="_blank"
+                rel="noreferrer"
+                title={s.label}
+                aria-label={s.label}
+                className="grid h-10 w-10 place-items-center rounded-xl text-white transition-all duration-200 ease-out hover:opacity-80"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={s.logoSrc}
+                  alt={s.label}
+                  className={`h-6 w-6 object-contain transition-all duration-200 ${s.logoClassName}`}
+                  loading="lazy"
+                  decoding="async"
+                  referrerPolicy="no-referrer"
+                />
+              </a>
+            );
+          })}
+        </div>
+      </div>
+
     </aside>
   );
 }
@@ -158,3 +207,4 @@ function IconDoc({ className }: { className?: string }) {
     </svg>
   );
 }
+

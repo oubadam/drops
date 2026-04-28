@@ -53,7 +53,7 @@ export default function ProfilePage() {
               alt="profile avatar"
               width={64}
               height={64}
-              className="h-16 w-16 object-cover"
+              className="w-16 h-auto object-cover"
               unoptimized={Boolean(profile?.avatarUrl?.startsWith("data:"))}
             />
           </div>

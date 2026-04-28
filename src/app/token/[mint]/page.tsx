@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useReducer, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { useParams } from "next/navigation";
 import { Connection, VersionedTransaction } from "@solana/web3.js";
-import type { CreatedCoinRecord } from "@/lib/created-coins-storage";
+import { loadCreatedCoins, type CreatedCoinRecord } from "@/lib/created-coins-storage";
 import { fetchSolanaTokenPairExploreStats, formatMcapUsd } from "@/lib/dexscreener-mcap";
 import { useOpenSignIn } from "@/components/sign-in-modal-context";
 import { formatLaunchAgo } from "@/lib/launch-time";
@@ -74,6 +74,8 @@ export default function TokenPage() {
   const [copiedCa, setCopiedCa] = useState(false);
   const [tokenInfo, setTokenInfo] = useState<PumpTokenInfoPayload | null>(null);
   const [, bumpWatch] = useReducer((x: number) => x + 1, 0);
+  const pumpPollBusyRef = useRef(false);
+  const statsPollBusyRef = useRef(false);
   const walletAddress = useSyncExternalStore(subscribeExternalWallet, getExternalWalletAddress, () => null);
   const { openSignIn } = useOpenSignIn();
   useEffect(() => {
@@ -90,38 +92,49 @@ export default function TokenPage() {
     setTokenInfo(null);
 
     void (async () => {
-      let launchesRes: Response | null = null;
-      let infoRes: Response | null = null;
-      try {
-        [launchesRes, infoRes] = await Promise.all([
-          fetch(`/api/launches?q=${encodeURIComponent(mint)}`, { cache: "no-store" }),
-          fetch(`/api/token-info/${encodeURIComponent(mint)}`, { cache: "no-store" }),
-        ]);
-      } catch {
-        if (!cancelled) setLoadState("notfound");
-        return;
-      }
+      const fetchWithTimeout = async (url: string, ms: number) => {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), ms);
+        try {
+          return await fetch(url, { cache: "no-store", signal: controller.signal });
+        } finally {
+          window.clearTimeout(timeout);
+        }
+      };
+
+      const [launchesResult, infoResult] = await Promise.allSettled([
+        fetchWithTimeout(`/api/launches?q=${encodeURIComponent(mint)}`, 6000),
+        fetchWithTimeout(`/api/token-info/${encodeURIComponent(mint)}`, 6000),
+      ]);
 
       let source: CreatedCoinRecord | null = null;
       let infoPayload: PumpTokenInfoPayload | null = null;
-      if (launchesRes?.ok) {
-        const j = (await launchesRes.json()) as { items?: CreatedCoinRecord[] };
+      if (launchesResult.status === "fulfilled" && launchesResult.value.ok) {
+        const j = (await launchesResult.value.json()) as { items?: CreatedCoinRecord[] };
         const items = Array.isArray(j.items) ? j.items : [];
         const exact = items.find((r) => r.mint === mint) ?? null;
         if (exact) source = exact;
       }
-      if (infoRes?.ok) {
-        const t = (await infoRes.json()) as PumpTokenInfoPayload;
+      if (infoResult.status === "fulfilled" && infoResult.value.ok) {
+        const t = (await infoResult.value.json()) as PumpTokenInfoPayload;
         if (t && t.mint === mint) {
           infoPayload = t;
           if (!source) source = pumpTokenInfoToCreatedRecord(t);
         }
       }
+      if (!source) {
+        const local = loadCreatedCoins().find((c) => c.mint === mint) ?? null;
+        if (local) source = local;
+      }
 
       if (cancelled) return;
       if (!source) {
-        setLoadState("notfound");
-        return;
+        source = {
+          mint,
+          name: mint.slice(0, 8),
+          symbol: "TOKEN",
+          createdAt: new Date().toISOString(),
+        };
       }
 
       const base: ExploreEnrichedCoin = {
@@ -164,12 +177,17 @@ export default function TokenPage() {
   useEffect(() => {
     if (!coin?.mint || loadState !== "ready") return;
     const id = window.setInterval(() => {
+      if (document.hidden || pumpPollBusyRef.current) return;
+      pumpPollBusyRef.current = true;
       void fetchPumpFrontCoinState(coin.mint)
         .then((pump) => {
           setCoin((prev) => (prev && prev.mint === coin.mint ? mergePump(prev, pump) : prev));
         })
-        .catch(() => {});
-    }, 2000);
+        .catch(() => {})
+        .finally(() => {
+          pumpPollBusyRef.current = false;
+        });
+    }, 8000);
     return () => window.clearInterval(id);
   }, [coin?.mint, loadState]);
 
@@ -331,12 +349,17 @@ export default function TokenPage() {
   useEffect(() => {
     if (!coin?.mint || loadState !== "ready") return;
     const id = window.setInterval(() => {
+      if (document.hidden || statsPollBusyRef.current) return;
+      statsPollBusyRef.current = true;
       void fetchSolanaTokenPairExploreStats(coin.mint)
         .then((stats) => {
           setCoin((prev) => (prev && prev.mint === coin.mint ? mergeStats(prev, stats) : prev));
         })
-        .catch(() => {});
-    }, 10000);
+        .catch(() => {})
+        .finally(() => {
+          statsPollBusyRef.current = false;
+        });
+    }, 20000);
     return () => window.clearInterval(id);
   }, [coin?.mint, loadState]);
 

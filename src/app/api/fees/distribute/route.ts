@@ -13,7 +13,7 @@ import {
   getPumpPortalApiKey,
   getSolanaRpcUrl,
 } from "@/lib/env";
-import { listFeeConfiguredLaunches } from "@/lib/drop-launches-db";
+import { listFeeConfiguredLaunches, recordFeeDistributionRun } from "@/lib/drop-launches-db";
 
 export const dynamic = "force-dynamic";
 const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -99,32 +99,56 @@ async function getTopHoldersByOwner(connection: Connection, mint: string, limit:
     .slice(0, limit);
 }
 
+function splitLamportsBySqrtWeight(
+  totalLamports: number,
+  holders: Array<{ owner: string; amount: bigint }>,
+): Array<{ to: string; lamports: number }> {
+  if (totalLamports <= 0 || holders.length === 0) return [];
+  if (holders.length === 1) return [{ to: holders[0].owner, lamports: totalLamports }];
+
+  const weighted = holders.map((h) => ({ to: h.owner, w: Math.sqrt(Number(h.amount)) }));
+  const sumW = weighted.reduce((a, b) => a + (Number.isFinite(b.w) ? b.w : 0), 0);
+  if (!Number.isFinite(sumW) || sumW <= 0) {
+    const each = Math.floor(totalLamports / holders.length);
+    return holders.map((h) => ({ to: h.owner, lamports: each }));
+  }
+
+  const out = weighted.map((h) => ({ to: h.to, lamports: Math.floor((totalLamports * h.w) / sumW) }));
+  const used = out.reduce((a, b) => a + b.lamports, 0);
+  const remainder = totalLamports - used;
+  if (remainder > 0 && out.length > 0) out[0].lamports += remainder;
+  return out;
+}
+
 async function sendLamportTransfers(
   connection: Connection,
   signer: Keypair,
   transfers: Array<{ to: string; lamports: number }>,
-): Promise<{ sent: number; signatures: string[] }> {
+): Promise<{ sent: number; signatures: string[]; lamportsSent: number }> {
   const valid = transfers.filter((t) => Number.isFinite(t.lamports) && t.lamports >= MIN_PAYOUT_LAMPORTS);
   let sent = 0;
+  let lamportsSent = 0;
   const signatures: string[] = [];
   for (let i = 0; i < valid.length; i += TX_BATCH_SIZE) {
     const batch = valid.slice(i, i + TX_BATCH_SIZE);
     const tx = new Transaction();
     for (const t of batch) {
+      const lamports = Math.floor(t.lamports);
       tx.add(
         SystemProgram.transfer({
           fromPubkey: signer.publicKey,
           toPubkey: new PublicKey(t.to),
-          lamports: Math.floor(t.lamports),
+          lamports,
         }),
       );
+      lamportsSent += lamports;
     }
     const sig = await connection.sendTransaction(tx, [signer], { skipPreflight: false });
     await connection.confirmTransaction(sig, "confirmed");
     signatures.push(sig);
     sent += batch.length;
   }
-  return { sent, signatures };
+  return { sent, signatures, lamportsSent };
 }
 
 export async function POST(request: Request) {
@@ -166,17 +190,26 @@ export async function POST(request: Request) {
       uniqueWhitelist.length > 0 ? Math.floor(whitelistSplitLamports / uniqueWhitelist.length) : 0;
     const whitelistTransfers = uniqueWhitelist.map((w) => ({ to: w, lamports: eachWhitelistLamports }));
 
-    const topHolders = await getTopHoldersByOwner(connection, launch.mint, launch.holderLimit || 100);
-    const totalTopHolderAmount = topHolders.reduce((acc, h) => acc + h.amount, 0n);
-    const holderTransfers = totalTopHolderAmount > 0n
-      ? topHolders.map((h) => ({
-          to: h.owner,
-          lamports: Number((BigInt(holdersSplitLamports) * h.amount) / totalTopHolderAmount),
-        }))
-      : [];
+    const topHoldersRaw = await getTopHoldersByOwner(connection, launch.mint, launch.holderLimit || 100);
+    const topHolders = topHoldersRaw.filter((h) => h.owner !== launch.creatorWallet && h.owner !== treasurySigner.publicKey.toBase58());
+    const holderTransfers = splitLamportsBySqrtWeight(holdersSplitLamports, topHolders);
 
     const whitelistSend = await sendLamportTransfers(connection, treasurySigner, whitelistTransfers);
     const holderSend = await sendLamportTransfers(connection, treasurySigner, holderTransfers);
+    const totalSentLamports = whitelistSend.lamportsSent + holderSend.lamportsSent;
+
+    await recordFeeDistributionRun({
+      mint: launch.mint,
+      claimSignature: claim.signature,
+      claimOk: claim.ok,
+      claimError: claim.ok ? null : claim.error ?? "claim_failed",
+      claimedLamports,
+      whitelistLamportsSent: whitelistSend.lamportsSent,
+      holdersLamportsSent: holderSend.lamportsSent,
+      totalSentLamports,
+      whitelistTransfersSent: whitelistSend.sent,
+      holderTransfersSent: holderSend.sent,
+    });
 
     results.push({
       mint: launch.mint,
@@ -191,6 +224,7 @@ export async function POST(request: Request) {
       holderLimit: launch.holderLimit,
       whitelistTransfersSent: whitelistSend.sent,
       holderTransfersSent: holderSend.sent,
+      totalSentLamports,
       payoutSignatures: [...whitelistSend.signatures, ...holderSend.signatures],
       status: "claim_and_distribution_executed",
     });
@@ -200,6 +234,6 @@ export async function POST(request: Request) {
     ok: true,
     runs: results.length,
     results,
-    note: "Claims and SOL distributions executed. Holder distribution uses top holder token accounts weighted by balance.",
+    note: "Claims and SOL distributions executed. Holder distribution uses top holder accounts (excluding creator) with sqrt-weighted spread.",
   });
 }

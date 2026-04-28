@@ -8,8 +8,8 @@ export default function DocsPage() {
           Docs
         </h1>
         <p className="mt-4">
-          drops is a launch platform where creators can create coins, route creator fees to a protected treasury wallet,
-          and auto-distribute payouts to configured wallets and top holders.
+          Drops is an immutable airdrop protocol for Pump.fun launches. You launch through Drops, then creator-fee payouts are
+          claimed and distributed automatically by the protocol rules saved at launch time.
         </p>
       </div>
 
@@ -18,52 +18,58 @@ export default function DocsPage() {
           Quick start
         </h2>
         <ol className="list-decimal space-y-2 pl-5">
+          <li>Connect your wallet from the top-right profile area.</li>
           <li>
-            Connect your wallet from the top-right profile area.
+            Go to <Link href="/create" className="text-[var(--pump-green)] hover:underline">Create</Link> and enter coin name, ticker, media, and socials.
           </li>
-          <li>
-            Go to <Link href="/create" className="text-[var(--pump-green)] hover:underline">Create</Link> and enter coin name, ticker, image, and links.
-          </li>
-          <li>Add 1 to 25 airdrop wallets (one wallet per input).</li>
-          <li>Set the creator-fee split slider for whitelist vs holders.</li>
-          <li>Launch coin and track it in Home, Explore, and Profile.</li>
+          <li>Add 1 to 25 payout wallets (whitelist).</li>
+          <li>Set the whitelist vs holders split.</li>
+          <li>Launch and track in Home, Explore, Token pages, and Profile.</li>
         </ol>
       </section>
 
       <section className="space-y-3">
         <h2 className="border-l-2 border-l-[var(--pump-yellow)] pl-3 text-lg font-bold text-[var(--pump-text)]">
-          How fee payouts work (simple)
+          How it works
         </h2>
         <ol className="list-decimal space-y-2 pl-5">
-          <li>Creator fees are routed to one treasury wallet configured by drops.</li>
-          <li>Every 5 minutes, drops claims creator fees for each launched coin.</li>
-          <li>A configured percentage is split equally between your whitelist wallets.</li>
-          <li>The rest is distributed to top 100 holders, weighted by holding amount.</li>
+          <li>Launch parameters are stored by the protocol and treated as immutable runtime config.</li>
+          <li>Creator fees are claimed via the configured worker flow.</li>
+          <li>Whitelist share is split equally across valid configured whitelist wallets.</li>
+          <li>Holders share is split by token balance weight across top holders (up to configured limit).</li>
+          <li>Payout runs are recorded and surfaced in app metrics.</li>
         </ol>
       </section>
 
       <section className="space-y-3">
         <h2 className="border-l-2 border-l-[var(--pump-yellow)] pl-3 text-lg font-bold text-[var(--pump-text)]">
-          What the tech does behind the scenes
+          Current protocol defaults
+        </h2>
+        <p>
+          The payout interval displayed in the app defaults to 5 minutes unless changed by configuration. Holder distribution
+          uses weighted balances and a capped holder set for efficiency.
+        </p>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="border-l-2 border-l-[var(--pump-yellow)] pl-3 text-lg font-bold text-[var(--pump-text)]">
+          What Home metrics mean
         </h2>
         <ul className="list-disc space-y-2 pl-5">
-          <li>Uploads your coin image/metadata to IPFS for a permanent token profile.</li>
-          <li>Creates the token through PumpPortal.</li>
-          <li>Stores launch settings in the drops backend database.</li>
-          <li>Runs an automated payout job every 5 minutes.</li>
-          <li>Shows created coins in the website feed and profile views.</li>
+          <li><span className="font-semibold text-[var(--pump-text)]">Tokens launched</span>: launchpad coins recorded by the backend.</li>
+          <li><span className="font-semibold text-[var(--pump-text)]">Token payouts</span>: launch-derived token distribution metric shown in millions.</li>
+          <li><span className="font-semibold text-[var(--pump-text)]">SOL airdropped</span>: summed on-chain payout amounts recorded by payout runs.</li>
         </ul>
       </section>
 
       <section className="space-y-3">
         <h2 className="border-l-2 border-l-[var(--pump-yellow)] pl-3 text-lg font-bold text-[var(--pump-text)]">
-          Notes
+          Operational checklist
         </h2>
         <ul className="list-disc space-y-2 pl-5">
-          <li>
-            Launch settings are locked by the platform config to keep fee routing safe and consistent.
-          </li>
-          <li>Always verify wallets before launch; payouts are automated from saved launch settings.</li>
+          <li>Use valid payout wallets before launching (double-check addresses).</li>
+          <li>Keep treasury config valid so claim/distribution jobs can execute.</li>
+          <li>After config changes, restart the app and verify the Home metrics/API health.</li>
         </ul>
       </section>
 

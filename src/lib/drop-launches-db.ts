@@ -1,5 +1,5 @@
 import type { CreatedCoinRecord } from "@/lib/created-coins-storage";
-import { getOfficialDropsMint, mintEndsWithDrop } from "@/lib/drop-coins";
+import { getOfficialDropsMint } from "@/lib/drop-coins";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 type DbRow = {
@@ -13,6 +13,10 @@ type DbRow = {
   holder_limit: number | null;
   fee_treasury_wallet: string | null;
   fee_recipient_locked: boolean | null;
+  dev_buy_airdrop_enabled: boolean | null;
+  dev_buy_airdrop_bps: number | null;
+  dev_buy_airdrop_supply_bps: number | null;
+  dev_buy_airdrop_wallet_bps: number[] | null;
   description: string | null;
   image_url: string | null;
   metadata_uri: string | null;
@@ -35,7 +39,7 @@ function mapRow(r: DbRow): CreatedCoinRecord {
 
 function applyListingRules(rows: CreatedCoinRecord[]): CreatedCoinRecord[] {
   const official = getOfficialDropsMint();
-  return rows.filter((r) => mintEndsWithDrop(r.mint) && (!official || r.mint !== official));
+  return rows.filter((r) => !official || r.mint !== official);
 }
 
 /** Persist a launch after PumpPortal create succeeds (server only). */
@@ -48,6 +52,10 @@ export async function recordDropLaunch(input: {
   whitelistFeeBps: number;
   holdersFeeBps: number;
   holderLimit: number;
+  devBuyAirdropEnabled: boolean;
+  devBuyAirdropBps: number;
+  devBuyAirdropSupplyBps: number;
+  devBuyAirdropWalletBps: number[];
   feeTreasuryWallet: string;
   feeRecipientLocked: boolean;
   description: string | null;
@@ -57,8 +65,6 @@ export async function recordDropLaunch(input: {
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const admin = getSupabaseAdmin();
   if (!admin) return { ok: false, error: "supabase_not_configured" };
-  if (!mintEndsWithDrop(input.mint)) return { ok: false, error: "mint_must_end_with_drop" };
-
   const { error } = await admin.from("drop_launches").insert({
     mint: input.mint,
     name: input.name,
@@ -68,6 +74,10 @@ export async function recordDropLaunch(input: {
     whitelist_fee_bps: input.whitelistFeeBps,
     holders_fee_bps: input.holdersFeeBps,
     holder_limit: input.holderLimit,
+    dev_buy_airdrop_enabled: input.devBuyAirdropEnabled,
+    dev_buy_airdrop_bps: input.devBuyAirdropBps,
+    dev_buy_airdrop_supply_bps: input.devBuyAirdropSupplyBps,
+    dev_buy_airdrop_wallet_bps: input.devBuyAirdropWalletBps,
     fee_treasury_wallet: input.feeTreasuryWallet,
     fee_recipient_locked: input.feeRecipientLocked,
     description: input.description,
@@ -104,6 +114,7 @@ export async function listDropLaunchesFromDb(creatorWallet?: string): Promise<Cr
 export type FeeConfiguredLaunch = {
   mint: string;
   symbol: string;
+  creatorWallet: string | null;
   whitelistWallets: string[];
   whitelistFeeBps: number;
   holdersFeeBps: number;
@@ -116,13 +127,14 @@ export async function listFeeConfiguredLaunches(): Promise<FeeConfiguredLaunch[]
   if (!admin) return [];
   const { data, error } = await admin
     .from("drop_launches")
-    .select("mint,symbol,whitelist_wallets,whitelist_fee_bps,holders_fee_bps,holder_limit,fee_treasury_wallet,fee_recipient_locked");
+    .select("mint,symbol,creator_wallet,whitelist_wallets,whitelist_fee_bps,holders_fee_bps,holder_limit,fee_treasury_wallet,fee_recipient_locked");
   if (error || !Array.isArray(data)) return [];
   return (data as Array<Record<string, unknown>>)
     .filter((r) => Boolean(r.fee_recipient_locked))
     .map((r) => ({
       mint: String(r.mint ?? ""),
       symbol: String(r.symbol ?? ""),
+      creatorWallet: typeof r.creator_wallet === "string" ? r.creator_wallet : null,
       whitelistWallets: Array.isArray(r.whitelist_wallets) ? (r.whitelist_wallets as string[]) : [],
       whitelistFeeBps: Number(r.whitelist_fee_bps ?? 0),
       holdersFeeBps: Number(r.holders_fee_bps ?? 10000),
@@ -130,4 +142,32 @@ export async function listFeeConfiguredLaunches(): Promise<FeeConfiguredLaunch[]
       feeTreasuryWallet: String(r.fee_treasury_wallet ?? ""),
     }))
     .filter((r) => r.mint.length > 0 && r.feeTreasuryWallet.length > 0);
+}
+
+export async function recordFeeDistributionRun(input: {
+  mint: string;
+  claimSignature: string | null;
+  claimOk: boolean;
+  claimError: string | null;
+  claimedLamports: number;
+  whitelistLamportsSent: number;
+  holdersLamportsSent: number;
+  totalSentLamports: number;
+  whitelistTransfersSent: number;
+  holderTransfersSent: number;
+}): Promise<void> {
+  const admin = getSupabaseAdmin();
+  if (!admin) return;
+  await admin.from("drop_fee_distribution_runs").insert({
+    mint: input.mint,
+    claim_signature: input.claimSignature,
+    claim_ok: input.claimOk,
+    claim_error: input.claimError,
+    claimed_lamports: Math.max(0, Math.floor(input.claimedLamports || 0)),
+    whitelist_lamports_sent: Math.max(0, Math.floor(input.whitelistLamportsSent || 0)),
+    holders_lamports_sent: Math.max(0, Math.floor(input.holdersLamportsSent || 0)),
+    total_sent_lamports: Math.max(0, Math.floor(input.totalSentLamports || 0)),
+    whitelist_transfers_sent: Math.max(0, Math.floor(input.whitelistTransfersSent || 0)),
+    holder_transfers_sent: Math.max(0, Math.floor(input.holderTransfersSent || 0)),
+  });
 }

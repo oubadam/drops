@@ -94,14 +94,16 @@ export function SignInModalPrivy({ onClose }: { onClose: () => void }) {
         await signUtf8MessageBase64(provider, `Sign in to drops\nWallet: ${address}\nTime: ${new Date().toISOString()}`);
         setExternalWalletAddress(address);
         setConnectedWallet(address);
-        const [nextProfile, nextBalance] = await Promise.all([
-          fetchProfile(address),
-          fetchWalletBalance(address).catch(() => null),
-        ]);
-        setProfile(nextProfile);
-        setBalance(nextBalance);
+        // Don't keep the UI stuck on "connecting" if profile/balance calls are slow.
+        setConnectingPhase(null);
+        setConnectingWalletLabel(null);
+        void Promise.all([fetchProfile(address).catch(() => null), fetchWalletBalance(address).catch(() => null)]).then(
+          ([nextProfile, nextBalance]) => {
+            if (nextProfile) setProfile(nextProfile);
+            if (nextBalance) setBalance(nextBalance);
+          },
+        );
       } catch (e) {
-        console.error("[sign-in] extension wallet connect failed", e);
         showWalletHint("Wallet connection failed. Please approve the extension prompt and retry.");
       } finally {
         setConnectingPhase(null);

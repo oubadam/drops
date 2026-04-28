@@ -40,6 +40,14 @@ export function HomeDropsExplore() {
   const [exploreFilters, setExploreFilters] = useState<ExploreAppliedFilters | null>(null);
   const [viewMode, setViewMode] = useState<ExploreViewMode>(() => readExploreViewMode());
   const [watchBump, bumpWatch] = useReducer((x: number) => x + 1, 0);
+  const [copyToastVisible, setCopyToastVisible] = useState(false);
+  const [copyToastEntered, setCopyToastEntered] = useState(false);
+  const [copyToastText, setCopyToastText] = useState("Contract address copied to clipboard");
+  const [homeMetrics, setHomeMetrics] = useState<{
+    tokensLaunched: number;
+    solAirdroppedSol: number;
+    tokenPayoutsMillions: number;
+  } | null>(null);
 
   const LIVE_REFRESH_LIMIT = 18;
 
@@ -48,6 +56,48 @@ export function HomeDropsExplore() {
     window.addEventListener(WATCHLIST_UPDATED_EVENT, fn);
     return () => window.removeEventListener(WATCHLIST_UPDATED_EVENT, fn);
   }, []);
+
+  useEffect(() => {
+    if (!copyToastVisible) return;
+    setCopyToastEntered(false);
+    const inId = window.setTimeout(() => setCopyToastEntered(true), 10);
+    const outId = window.setTimeout(() => setCopyToastEntered(false), 2200);
+    const hideId = window.setTimeout(() => {
+      setCopyToastVisible(false);
+      setCopyToastEntered(false);
+    }, 3000);
+    return () => {
+      window.clearTimeout(inId);
+      window.clearTimeout(outId);
+      window.clearTimeout(hideId);
+    };
+  }, [copyToastVisible]);
+
+  async function copyText(text: string): Promise<boolean> {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // fallback below
+    }
+    try {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.focus();
+      area.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(area);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
 
   const enrichCoins = useCallback(async (coins: ExploreEnrichedCoin[]) => {
     const targets = coins.slice(0, LIVE_REFRESH_LIMIT);
@@ -148,12 +198,39 @@ export function HomeDropsExplore() {
     await enrichCoins(next);
   }, [enrichCoins]);
 
+  const refreshHomeMetrics = useCallback(async () => {
+    try {
+      const r = await fetch("/api/home-metrics", { cache: "no-store" });
+      if (!r.ok) return;
+      const j = (await r.json()) as {
+        tokensLaunched?: number;
+        solAirdroppedSol?: number;
+        tokenPayoutsMillions?: number;
+      };
+      setHomeMetrics({
+        tokensLaunched: typeof j.tokensLaunched === "number" ? j.tokensLaunched : 0,
+        solAirdroppedSol: typeof j.solAirdroppedSol === "number" ? j.solAirdroppedSol : 0,
+        tokenPayoutsMillions: typeof j.tokenPayoutsMillions === "number" ? j.tokenPayoutsMillions : 0,
+      });
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     const run = () => startTransition(() => void loadRows());
     run();
+    void refreshHomeMetrics();
     window.addEventListener(DROP_COINS_UPDATED_EVENT, run);
     return () => window.removeEventListener(DROP_COINS_UPDATED_EVENT, run);
-  }, [loadRows]);
+  }, [loadRows, refreshHomeMetrics]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void refreshHomeMetrics();
+    }, 30000);
+    return () => window.clearInterval(id);
+  }, [refreshHomeMetrics]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -194,6 +271,19 @@ export function HomeDropsExplore() {
     return watchlistRows.filter((c) => passesExploreFilters(c, exploreFilters));
   }, [watchlistRows, exploreFilters]);
 
+  const officialTokenCa = (
+    process.env.NEXT_PUBLIC_OFFICIAL_TOKEN_CA ??
+    process.env.NEXT_PUBLIC_OFFICIAL_DROPS_MINT ??
+    ""
+  ).trim();
+  const configuredAirdropIntervalMinutes = Number(process.env.NEXT_PUBLIC_AIRDROP_INTERVAL_MINUTES ?? "5");
+  const launchedCount = homeMetrics?.tokensLaunched ?? rows.length;
+  const solAirdroppedText = `${(homeMetrics?.solAirdroppedSol ?? 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} SOL`;
+  const tokenPayoutsText = `${(homeMetrics?.tokenPayoutsMillions ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M tokens`;
+  const airdropIntervalText = Number.isFinite(configuredAirdropIntervalMinutes) && configuredAirdropIntervalMinutes > 0
+    ? `${configuredAirdropIntervalMinutes} minutes`
+    : "5 minutes";
+
   const listSection = (coins: ExploreEnrichedCoin[], emptyLabel: string) => {
     if (coins.length === 0) {
       return (
@@ -216,6 +306,68 @@ export function HomeDropsExplore() {
 
   return (
     <section className="w-full text-left">
+      {copyToastVisible ? (
+        <div
+          className={`pointer-events-none fixed left-1/2 top-4 z-[260] -translate-x-1/2 rounded-xl border border-[#3b82f6] bg-[#0b1018]/95 px-4 py-3 text-sm font-semibold text-white transition-all duration-700 ease-in-out ${
+            copyToastEntered ? "translate-y-4 opacity-100" : "-translate-y-3 opacity-0"
+          }`}
+        >
+          {copyToastText}
+        </div>
+      ) : null}
+      <div>
+        <div className="mb-4 rounded-2xl border border-[var(--pump-border)] bg-[var(--pump-elevated)] px-4 py-4 sm:px-5">
+          <h2 className="text-xl font-black tracking-tight text-white sm:text-2xl">How drops works</h2>
+          <p className="mt-2 max-w-4xl text-sm leading-relaxed text-[var(--pump-muted)]">
+            Drops is the first immutable airdrop protocol for Pump.fun launches. When a token is created, payout rules are locked
+            at launch time and cannot be edited later. Every cycle (currently{" "}
+            <span className="font-semibold text-[var(--pump-text)]">{airdropIntervalText}</span>), the system claims creator fees,
+            splits SOL to your configured whitelist wallets, then distributes the remaining share to top holders weighted by
+            balance. No manual claim loops, no custom scripts, just automatic recurring payouts.
+          </p>
+        </div>
+
+        <div className="mb-7 overflow-hidden rounded-2xl border border-[var(--pump-border)] bg-[var(--pump-elevated)]">
+          <div className="border-b border-[var(--pump-border)] px-4 py-2.5 sm:px-5">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--pump-muted)]">
+              <span className="font-bold tracking-wide text-[var(--pump-text)]">OFFICIAL CA</span>
+              <button
+                type="button"
+                disabled={!officialTokenCa}
+                onClick={() => {
+                  if (!officialTokenCa) {
+                    setCopyToastText("Set NEXT_PUBLIC_OFFICIAL_TOKEN_CA in .env.local");
+                    setCopyToastVisible(true);
+                    return;
+                  }
+                  void copyText(officialTokenCa).then((ok) => {
+                    setCopyToastText(ok ? "Contract address copied to clipboard" : "Could not copy contract address");
+                    setCopyToastVisible(true);
+                  });
+                }}
+                className="max-w-full cursor-pointer truncate rounded-md border border-[var(--pump-border)] px-2 py-0.5 font-mono text-[10px] text-[var(--pump-text)] hover:border-[var(--pump-green)]/50 disabled:cursor-default disabled:opacity-70 sm:text-[11px]"
+              >
+                {officialTokenCa || "Set NEXT_PUBLIC_OFFICIAL_TOKEN_CA"}
+              </button>
+            </div>
+          </div>
+          <div className="grid gap-0.5 bg-[var(--pump-border)] sm:grid-cols-3">
+            <div className="bg-[var(--pump-elevated)] px-4 py-4 sm:px-5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--pump-muted)]">SOL Airdropped (all-time)</p>
+              <p className="mt-1 text-2xl font-black tracking-tight text-[var(--pump-text)]">{solAirdroppedText}</p>
+            </div>
+            <div className="bg-[var(--pump-elevated)] px-4 py-4 sm:px-5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--pump-muted)]">Tokens Launched</p>
+              <p className="mt-1 text-2xl font-black tracking-tight text-[var(--pump-text)]">{launchedCount}</p>
+            </div>
+            <div className="bg-[var(--pump-elevated)] px-4 py-4 sm:px-5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--pump-muted)]">Token Payouts</p>
+              <p className="mt-1 text-2xl font-black tracking-tight text-[var(--pump-text)]">{tokenPayoutsText}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-2xl font-black tracking-tight text-white">Trending now</h2>
@@ -227,7 +379,7 @@ export function HomeDropsExplore() {
           No coins have been created yet.
         </p>
       ) : (
-        <div className="flex gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex w-full gap-3 overflow-x-auto pb-2 pr-1 touch-pan-x [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {trending.map((c) => (
             <TrendingCard key={c.mint} coin={c} />
           ))}

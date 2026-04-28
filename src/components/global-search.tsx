@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { startTransition, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { DROP_COINS_UPDATED_EVENT, type CreatedCoinRecord } from "@/lib/created-coins-storage";
-import { truncateMintMiddle } from "@/lib/drop-coins";
+import { mintEndsWithDrop, truncateMintMiddle } from "@/lib/drop-coins";
 import { loadDropLaunchesForUi } from "@/lib/load-drop-launches";
 import { fetchSolanaTokenBestMcapUsd, formatMcapUsd } from "@/lib/dexscreener-mcap";
 import { formatLaunchAgo } from "@/lib/launch-time";
@@ -44,7 +44,7 @@ export function GlobalSearch({ layout }: { layout: GlobalSearchLayout }) {
 
   const refreshRows = useCallback(async () => {
     const base = await loadDropLaunchesForUi();
-    const next: Row[] = base.map((c) => ({ ...c, mcap: null }));
+    const next: Row[] = base.filter((c) => mintEndsWithDrop(c.mint)).map((c) => ({ ...c, mcap: null }));
     setRows(next);
     await Promise.all(
       next.map(async (c) => {
