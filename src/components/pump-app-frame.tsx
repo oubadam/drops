@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import bgdrops from "@/components/bgdrops.png";
 import { PumpMainTopBar } from "@/components/pump-main-top-bar";
 import { PumpMobileNav } from "@/components/pump-mobile-nav";
@@ -13,7 +13,9 @@ export function PumpAppFrame({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-dvh overflow-hidden bg-transparent text-[var(--pump-text)]">
       <RoutePrefetcher />
-      <RouteProgressBar />
+      <Suspense fallback={null}>
+        <RouteProgressBar />
+      </Suspense>
       <WelcomeModal />
       <PumpSidebar />
       <div className="@container/topbar relative isolate z-0 flex min-h-0 min-w-0 flex-1 flex-col border-l-0 md:border-l md:border-[var(--pump-border)]">
