@@ -21,7 +21,9 @@ export const metadata: Metadata = {
   title: "drops",
   description: "Create pump.fun coins via PumpPortal + Pinata. Home, create, profile, docs.",
   icons: {
-    icon: normaldrop.src,
+    icon: [{ url: normaldrop.src, type: "image/png" }],
+    shortcut: [{ url: normaldrop.src, type: "image/png" }],
+    apple: [{ url: normaldrop.src, type: "image/png" }],
   },
 };
 

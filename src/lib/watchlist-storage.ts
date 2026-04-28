@@ -1,14 +1,21 @@
+import { getHiddenMints } from "@/lib/drop-coins";
+
 export const WATCHLIST_MINTS_KEY = "drop_watchlist_mints_v1";
 export const WATCHLIST_UPDATED_EVENT = "drop-watchlist-updated";
 
 export function loadWatchlistMints(): string[] {
   if (typeof window === "undefined") return [];
+  const hidden = getHiddenMints();
   try {
     const raw = window.localStorage.getItem(WATCHLIST_MINTS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((x): x is string => typeof x === "string" && x.length > 0);
+    const filtered = parsed.filter((x): x is string => typeof x === "string" && x.length > 0 && !hidden.has(x));
+    if (filtered.length !== parsed.length) {
+      window.localStorage.setItem(WATCHLIST_MINTS_KEY, JSON.stringify(filtered));
+    }
+    return filtered;
   } catch {
     return [];
   }
