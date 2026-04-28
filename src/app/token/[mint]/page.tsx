@@ -15,6 +15,7 @@ import { EMPTY_PUMP_FRONT_STATE, fetchPumpFrontCoinState } from "@/lib/pump-fron
 import { pumpTokenInfoToCreatedRecord, type PumpTokenInfoPayload } from "@/lib/pump-token-info";
 import { findInjectedProviderByAddress, signAndSendTransactionBase58 } from "@/lib/solana-injected-wallet";
 import { isMintWatchlisted, toggleWatchlistMint, WATCHLIST_UPDATED_EVENT } from "@/lib/watchlist-storage";
+import { getHiddenMints } from "@/lib/drop-coins";
 
 const emptyCoin: ExploreEnrichedCoin = {
   mint: "",
@@ -86,6 +87,12 @@ export default function TokenPage() {
 
   useEffect(() => {
     if (!mint) return;
+    if (getHiddenMints().has(mint)) {
+      setLoadState("notfound");
+      setCoin(null);
+      setTokenInfo(null);
+      return;
+    }
     let cancelled = false;
     setLoadState("loading");
     setCoin(null);

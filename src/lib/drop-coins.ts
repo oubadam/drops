@@ -1,6 +1,9 @@
 import type { CreatedCoinRecord } from "@/lib/created-coins-storage";
 
 export const DROP_MINT_SUFFIX = "drop";
+const HARD_BLOCKED_MINTS = new Set<string>([
+  "2ra5idczuCQhDe1U5D52G8Rms6hzHuHeTqP51fdHpump",
+]);
 
 export function mintEndsWithDrop(mint: string): boolean {
   return mint.endsWith(DROP_MINT_SUFFIX);
@@ -17,7 +20,7 @@ export function getHiddenMints(): Set<string> {
     .split(",")
     .map((v) => v.trim())
     .filter((v) => v.length > 0);
-  return new Set(list);
+  return new Set([...HARD_BLOCKED_MINTS, ...list]);
 }
 
 /** Coins created in this app that qualify for drops home (…drop mint), excluding official token. */

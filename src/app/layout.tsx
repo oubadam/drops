@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppProviders } from "@/components/app-providers";
 import { PumpAppFrame } from "@/components/pump-app-frame";
+import normaldrop from "@/components/normaldrop.png";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
   title: "drops",
   description: "Create pump.fun coins via PumpPortal + Pinata. Home, create, profile, docs.",
   icons: {
-    icon: "/drops-favicon.svg",
+    icon: normaldrop.src,
   },
 };
 
