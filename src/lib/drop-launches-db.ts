@@ -1,5 +1,5 @@
 import type { CreatedCoinRecord } from "@/lib/created-coins-storage";
-import { getOfficialDropsMint } from "@/lib/drop-coins";
+import { getHiddenMints } from "@/lib/drop-coins";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 type DbRow = {
@@ -38,8 +38,8 @@ function mapRow(r: DbRow): CreatedCoinRecord {
 }
 
 function applyListingRules(rows: CreatedCoinRecord[]): CreatedCoinRecord[] {
-  const official = getOfficialDropsMint();
-  return rows.filter((r) => !official || r.mint !== official);
+  const hidden = getHiddenMints();
+  return rows.filter((r) => !hidden.has(r.mint));
 }
 
 /** Persist a launch after PumpPortal create succeeds (server only). */

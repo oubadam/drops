@@ -17,8 +17,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "drop — create on pump.fun",
+  title: "drops",
   description: "Create pump.fun coins via PumpPortal + Pinata. Home, create, profile, docs.",
+  icons: {
+    icon: "/drops-favicon.svg",
+  },
 };
 
 export default function RootLayout({

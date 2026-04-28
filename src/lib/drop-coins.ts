@@ -11,10 +11,19 @@ export function getOfficialDropsMint(): string | null {
   return v && v.length > 0 ? v : null;
 }
 
+export function getHiddenMints(): Set<string> {
+  const raw = process.env.NEXT_PUBLIC_HIDDEN_MINTS ?? "";
+  const list = raw
+    .split(",")
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+  return new Set(list);
+}
+
 /** Coins created in this app that qualify for drops home (…drop mint), excluding official token. */
 export function filterDropLaunches(coins: CreatedCoinRecord[]): CreatedCoinRecord[] {
-  const official = getOfficialDropsMint();
-  return coins.filter((c) => mintEndsWithDrop(c.mint) && (!official || c.mint !== official));
+  const hidden = getHiddenMints();
+  return coins.filter((c) => mintEndsWithDrop(c.mint) && !hidden.has(c.mint));
 }
 
 /** Placeholder until wallet connect supplies creator; shows first 6 of mint for layout parity. */
